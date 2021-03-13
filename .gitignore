@@ -1,0 +1,6 @@
+.vscode
+mnist
+images
+.DS_Store
+__pycache__
+log
