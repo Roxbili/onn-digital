@@ -97,7 +97,7 @@ class Feature(object):
         """calculate features, which are vector array"""
         self._get_points()  # points are added to white_point and black point
         self._calc_features()
-        return self._v
+        return (self._v, self._data['labels'])
 
     def compress(self):
         """compress feature vector to small vector
@@ -110,7 +110,7 @@ class Feature(object):
                 compress_v.append(sum(single_v[start_id:start_id+3]))
             self._compress_v.append(compress_v)
         self._compress_v = np.array(self._compress_v)
-        return self._compress_v
+        return (self._compress_v, self._data['labels'])
 
     def hist(self, save_path, data):
         """develop function"""
@@ -124,13 +124,19 @@ class Feature(object):
         self._fv = 20 + k * (vector - vector.min())
         if is_round == True:
             self._fv = self._fv // 10 * 10
-        return self._fv
+        return (self._fv, self._data['labels'])
 
-    def cut_into_batch(self, batch_size, vector):
-        input_data = []
+    def cut_into_batch(self, batch_size, vector, labels):
+        """cut data into batch_data
+            
+            Return:
+                input_data: a dict, use input_data['data'] and input_data['labels']
+        """
+        input_data = {}
         for start_batch in range(0, vector.shape[0], batch_size):
-            input_data.append(vector[start_batch:start_batch+batch_size])
-        self.input_data = np.array(input_data)
+            input_data['data'] = vector[start_batch:start_batch+batch_size]
+            input_data['labels'] = labels[start_batch:start_batch+batch_size]
+        self.input_data = input_data
         return self.input_data
 
     def _calc_features(self):
