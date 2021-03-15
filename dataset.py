@@ -6,7 +6,7 @@ import os
 import cv2
 import matplotlib.pyplot as plt
 
-from save_imgs import save_images
+from utils.save_imgs import save_images
 
 class MNIST(object):
     def __init__(self, data_dir, kind, shape=None):
@@ -132,10 +132,12 @@ class Feature(object):
             Return:
                 input_data: a dict, use input_data['data'] and input_data['labels']
         """
-        input_data = {}
+        input_data = []
         for start_batch in range(0, vector.shape[0], batch_size):
-            input_data['data'] = vector[start_batch:start_batch+batch_size]
-            input_data['labels'] = labels[start_batch:start_batch+batch_size]
+            input_data.append(
+                (vector[start_batch:start_batch+batch_size],
+                labels[start_batch:start_batch+batch_size])
+            )
         self.input_data = input_data
         return self.input_data
 

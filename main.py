@@ -4,14 +4,17 @@ import os
 import numpy as np
 
 from dataset import MNIST, Feature
-from model import Net
+from model import Net, LossFunc, Optim
 
-config = {
-    'input_size': 9,
-    'layer1_node': 5,
-    'batch_size': 1000,
-    'num_class': 10,
-}
+
+# network parameters
+input_size = 9
+layer1_node = 5
+batch_size = 1000
+num_class = 10
+
+epochs = [100, 100, 100]
+search_step = [200, 100, 20]
 
 if __name__ == '__main__':
     
@@ -37,4 +40,18 @@ if __name__ == '__main__':
 
     ############### model define ###############
 
-    net = Net(config=config)
+    net = Net(input_size, layer1_node, num_class)
+    loss = LossFunc()
+    optimizer = Optim(net)
+
+    ############### train ###############
+
+    for index in range(len(epochs)):
+        epoch = epochs[index]
+        optimizer.search_step = search_step[index]
+        for _ in range(epoch):
+            for i, (input, labels) in enumerate(input_train_data):
+                outputs = net(input)
+                acc = loss(outputs, labels)
+                print(acc)
+                optimizer.update(acc, outputs, labels)

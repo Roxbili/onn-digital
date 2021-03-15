@@ -1,6 +1,7 @@
 #-*- encoding: utf-8 -*-
 
 import numpy as np
+import random
 
 class Linear(object):
     """Linear layer
@@ -13,7 +14,8 @@ class Linear(object):
         self.in_features = in_features
         self.out_features = out_features
 
-        self.bias = np.array([160 for _ in range(out_features)])     # init value is the middle value of 20MHz to 300MHz
+        self.bias = np.array([random.randint(-30, 30) * 10 for _ in range(out_features)])
+        # print(self.bias)
 
     def __call__(self, input):
         return self.forward(input)
@@ -37,15 +39,84 @@ class Linear(object):
 
 class LossFunc(object):
     """Loss function for this network"""
-    def __init__(self, ):
+    def __init__(self):
         pass
 
-class Net(object):
-    def __init__(self, config):
-        self.config = config
+    def __call__(self, outputs, labels):
+        self.outputs = outputs
+        self.labels = labels
+        
+        self.calc()
 
-        self.layer1 = Linear(self.config['input_size'], self.config['layer1_node'])
-        self.layer2 = Linear(self.config['layer1_node'], self.config['num_class'])
+    def calc(self):
+        equal_array = np.equal(self.outputs.argmax(axis=1), self.labels)
+        acc = np.mean(equal_array)
+        return acc
+
+class Optim(object):
+    """Optimization operator, to updata parameters in model"""
+    def __init__(self, net):
+        self.net = net
+        self.search_step = None
+
+        self.max_acc = 0
+        self.store_bias = None
+        self.store_non_label_output_sum = None
+
+    def update(self, acc, outputs, labels):
+        if acc > self.max_acc:
+            self.max_acc = acc
+            self.store_bias = self.net.bias
+            self.store_non_label_output_sum = self._calc_non_label_output_sum(outputs, labels)
+        else:
+            if self._accept(outputs, labels) == False:
+                # give up this bias
+                self.net.bias = self.store_bias
+            else:
+                # althought acc is smaller, still accept this bias
+                self.store_bias = self.net.bias
+        # all situation need to step for next bias
+        self._step(self.search_step)
+
+    def _accept(self, outputs, labels):
+        """judge to accept this bias or not
+
+            if the sum of non_abel output is smaller than last epoch, accepy.
+        """
+        non_label_output_sum = self._calc_non_label_output_sum(outputs, labels)
+        if non_label_output_sum < self.store_non_label_output_sum:
+            self.store_non_label_output_sum = non_label_output_sum
+            return True
+        else:
+            return False
+
+    def _calc_non_label_output_sum(self, outputs, labels):
+        """calculate the sum of non-label output"""
+        mask = np.ones(outputs.shape)
+        for i in range(len(labels)):
+            j = labels[i]
+            mask[i][j] = 0
+        non_label_output = outputs * mask
+        # print(non_label_output)
+        return non_label_output.sum()
+
+    def _step(self, search_step):
+        """update bias
+
+            Args: the range of search area. If search_step = 300 means init position.
+        """
+        base_search_step = search_step // 10
+        step_info = [random.randint(-base_search_step, base_search_step) * 10 for _ in range(self.net.bias)]
+        self.net.bias += step_info
+
+class Net(object):
+    def __init__(self, input_size, layer1_node, num_class):
+
+        self.layer1 = Linear(input_size, layer1_node)
+        self.layer2 = Linear(layer1_node, num_class)
+
+    def __call__(self, x):
+        return self.forward(x)
 
     def forward(self, x):
         out1 = self.layer1(x)
@@ -55,9 +126,12 @@ class Net(object):
 
 
 if __name__ == '__main__':
-    layer1 = Linear(9, 5)
-    layer2 = Linear(5, 10)
+    # layer1 = Linear(9, 5)
+    # layer2 = Linear(5, 10)
 
-    data = np.ones((1000, 9))
-    out = layer1(data)
-    layer2(out)
+    # data = np.ones((1000, 9))
+    # out = layer1(data)
+    # layer2(out)
+
+    optimizer = Optim(None)
+    optimizer._calc_non_label_output_sum(np.random.rand(3,4), np.array([1, 0, 2]))
