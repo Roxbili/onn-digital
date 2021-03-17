@@ -46,7 +46,7 @@ class LossFunc(object):
         self.outputs = outputs
         self.labels = labels
         
-        self.calc()
+        return self.calc()
 
     def calc(self):
         equal_array = np.equal(self.outputs.argmax(axis=1), self.labels)
@@ -66,17 +66,17 @@ class Optim(object):
     def update(self, acc, outputs, labels):
         if acc > self.max_acc:
             self.max_acc = acc
-            self.store_bias = self.net.bias
+            self.store_bias = self.net.get_parameters()
             self.store_non_label_output_sum = self._calc_non_label_output_sum(outputs, labels)
         else:
             if self._accept(outputs, labels) == False:
-                # give up this bias
-                self.net.bias = self.store_bias
+                # give up this bias, restore last bias
+                self.net.set_parameters(self.store_bias)
             else:
                 # althought acc is smaller, still accept this bias
-                self.store_bias = self.net.bias
+                self.store_bias = self.net.get_parameters()
         # all situation need to step for next bias
-        self._step(self.search_step)
+        self._step(self.search_step, self.net.get_parameters())
 
     def _accept(self, outputs, labels):
         """judge to accept this bias or not
@@ -100,14 +100,19 @@ class Optim(object):
         # print(non_label_output)
         return non_label_output.sum()
 
-    def _step(self, search_step):
+    def _step(self, search_step, net_bias):
         """update bias
 
             Args: the range of search area. If search_step = 300 means init position.
         """
         base_search_step = search_step // 10
-        step_info = [random.randint(-base_search_step, base_search_step) * 10 for _ in range(self.net.bias)]
-        self.net.bias += step_info
+        new_bias = []
+        for layer_bias in net_bias:
+            # print(layer_bias.shape)
+            step_info = [random.randint(-base_search_step, base_search_step) * 10 for _ in range(layer_bias.shape[0])]
+            layer_bias += step_info
+            new_bias.append(layer_bias)
+        self.net.set_parameters(new_bias)
 
 class Net(object):
     def __init__(self, input_size, layer1_node, num_class):
@@ -122,7 +127,13 @@ class Net(object):
         out1 = self.layer1(x)
         out2 = self.layer2(out1)
         return out2
-        
+
+    def get_parameters(self):
+        return [self.layer1.bias, self.layer2.bias]
+
+    def set_parameters(self, bias):
+        self.layer1.bias = bias[0]
+        self.layer2.bias = bias[1]
 
 
 if __name__ == '__main__':

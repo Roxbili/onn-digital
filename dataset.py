@@ -66,7 +66,7 @@ class MNIST(object):
                 worker_num: how many threads to use
                 mode: 'img' or 'array'
         """
-        save_images(path, self._data['images'], self._data['labels'], mode=mode)
+        save_images(path, self._data['images'], self._data['labels'], worker_num=worker_num, mode=mode)
         print('all images have been saved to %s' % path)
 
 
@@ -219,7 +219,8 @@ class Feature(object):
 
 
 if __name__ == '__main__':
-    train_set = MNIST('mnist', 'train', shape=(10,10))
-    test_set = MNIST('mnist', 't10k', shape=(10,10))
+    # train_set = MNIST('mnist', 'train', shape=(10,10))
+    test_set = MNIST('mnist', 't10k', shape=(28,28))
 
     # print(test_set.data['images'].shape)
+    test_set.save_img('images', 4, mode='img')
