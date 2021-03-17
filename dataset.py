@@ -47,7 +47,7 @@ class MNIST(object):
         self._data['labels'] = labels
 
     def _resize_array(self, data, shape):
-        """resize numpy array
+        """Resize numpy array
             
             Args:
                 data: numpy array
@@ -59,7 +59,7 @@ class MNIST(object):
         return ret
 
     def save_img(self, path, worker_num, mode='array'):
-        """save images to path
+        """Save images to path
 
             Args:
                 path: where to save images
@@ -71,7 +71,7 @@ class MNIST(object):
 
 
 class Feature(object):
-    """get features object
+    """Get features object
 
         Args:
             data: array of images data
@@ -94,13 +94,13 @@ class Feature(object):
         self._integrogram()
 
     def calc_feature_vector(self):
-        """calculate features, which are vector array"""
+        """Calculate features, which are vector array"""
         self._get_points()  # points are added to white_point and black point
         self._calc_features()
         return (self._v, self._data['labels'])
 
     def compress(self):
-        """compress feature vector to small vector
+        """Compress feature vector to small vector
 
             This is an optional selection.
         """
@@ -113,7 +113,7 @@ class Feature(object):
         return (self._compress_v, self._data['labels'])
 
     def hist(self, save_path, data):
-        """develop function"""
+        """Develop function"""
         fig = plt.figure()
         plt.hist(data)
         # fig = plt.gcf()
@@ -127,7 +127,7 @@ class Feature(object):
         return (self._fv, self._data['labels'])
 
     def cut_into_batch(self, batch_size, vector, labels):
-        """cut data into batch_data
+        """Cut data into batch_data
             
             Return:
                 input_data: a dict, use input_data['data'] and input_data['labels']
@@ -142,7 +142,7 @@ class Feature(object):
         return self.input_data
 
     def _calc_features(self):
-        """get freature vectory array according to point position"""
+        """Get freature vectory array according to point position"""
         for i in range(self.integ_graph.shape[0]):
             # if i % 1000 == 0:
             #     print(i)
@@ -156,7 +156,7 @@ class Feature(object):
         self._v = np.array(self._v)
 
     def _area_val(self, index, points):
-        """calculate the value of one area"""
+        """Calculate the value of one area"""
         lt_line_id, lt_col_id, rb_line_id, rb_col_id = points
         sum = 0
         sum += self._get_integ_graph_val(index, lt_line_id - 1, lt_col_id - 1)
@@ -172,7 +172,7 @@ class Feature(object):
             return self.integ_graph[i][line_id][col_id]    # coordinate (x, y) -> array[y][x]
 
     def _get_points(self):
-        """get feature areas points"""
+        """Get feature areas points"""
         shape = self._data['images'].shape[1:]
 
         self.black_point = []
@@ -187,7 +187,7 @@ class Feature(object):
                 self.white_point.append(tuple(map(int, self._calc_xy(self.xkernet_size / 2, i, j))))    # error col
 
     def _calc_xy(self, base_pos, i, j):
-        """calculate left point and right point
+        """Calculate left point and right point
         
             Return:
                 lt_line_id, lt_col_id, rb_line_id, rb_col_id
@@ -206,7 +206,7 @@ class Feature(object):
             return data, data
 
     def _integrogram(self):
-        """get integrogram graph"""
+        """Get integrogram graph"""
         self.integ_graph = np.zeros((self._data['images'].shape[0], self._data['images'].shape[1], self._data['images'].shape[2]), dtype=np.int)
         for i in range(self._data['images'].shape[0]):
             graph = np.zeros((self._data['images'].shape[1], self._data['images'].shape[2]), dtype=np.int)

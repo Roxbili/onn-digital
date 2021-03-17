@@ -26,8 +26,10 @@ class Linear(object):
             Args:
                 input: shape=(batch_size, in_features)
         """
-        img_sum = input.sum(axis=1, keepdims=True) # shape = (batch_size,)
-        img_sum = img_sum.repeat(self.out_features, axis=1)
+        # img_sum = input.sum(axis=1, keepdims=True) # shape = (batch_size,)
+        # img_sum = img_sum.repeat(self.out_features, axis=1)
+        
+        img_sum = self._sum_regular(input)
         # print(img_sum.shape)
         batch_size_bias = np.tile(self.bias, (input.shape[0], 1))
         # print(batch_size_bias.shape)
@@ -36,6 +38,19 @@ class Linear(object):
         # print(output.shape)     # output shape = (batch_size, out_features)
         return output
 
+    def _sum_regular(self, input):
+        """Change input scale
+        
+            (20*9, 300*9) -> (500/16, 500/2)
+        """
+        img_sum = input.sum(axis=1, keepdims=True) # shape = (batch_size,)
+        img_sum /= 9.
+
+        # Consider to reuse this block combined with dataset.py's encoding function
+        k = (250 - 31.25) / (300 - 20)
+        img_sum = 31.25 + k * (img_sum - 20)
+        img_sum = img_sum // 10 * 10    # round to multiples of 10
+        return img_sum
 
 class LossFunc(object):
     """Loss function for this network"""
@@ -79,7 +94,7 @@ class Optim(object):
         self._step(self.search_step, self.net.get_parameters())
 
     def _accept(self, outputs, labels):
-        """judge to accept this bias or not
+        """Judge to accept this bias or not
 
             if the sum of non_abel output is smaller than last epoch, accepy.
         """
@@ -91,7 +106,7 @@ class Optim(object):
             return False
 
     def _calc_non_label_output_sum(self, outputs, labels):
-        """calculate the sum of non-label output"""
+        """Calculate the sum of non-label output"""
         mask = np.ones(outputs.shape)
         for i in range(len(labels)):
             j = labels[i]
@@ -101,7 +116,7 @@ class Optim(object):
         return non_label_output.sum()
 
     def _step(self, search_step, net_bias):
-        """update bias
+        """Update bias
 
             Args: the range of search area. If search_step = 300 means init position.
         """
