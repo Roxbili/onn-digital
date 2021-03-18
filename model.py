@@ -3,6 +3,38 @@
 import numpy as np
 import random
 
+from utils.utils import limit_scale, rescale
+
+class Relu(object):
+    """Relu layer
+    
+        Relu layer will not change input shape
+
+        Args:
+            low_threshold: floor line
+            up_thresbold: roof line
+    """
+    def __init__(self, low_threshold, up_threshold):
+        self.low_threshold = low_threshold
+        self.up_thresbold = up_threshold
+
+    def __call__(self, input):
+        return self.forward(input)
+
+    def forward(self, input):
+        """Forward network
+
+            Args:
+                input: shape=(batch_size, layer_shape)
+
+            Return:
+                output: shape=(batch_size, layer_shape)
+        """
+        input[input < self.low_threshold] = 0
+        input[input > self.up_thresbold] = 0
+        return input
+
+
 class Linear(object):
     """Linear layer
 
@@ -27,14 +59,18 @@ class Linear(object):
                 input: shape=(batch_size, in_features)
         """
         # img_sum = input.sum(axis=1, keepdims=True) # shape = (batch_size,)
-        # img_sum = img_sum.repeat(self.out_features, axis=1)
-        
         img_sum = self._sum_regular(input)
+        img_sum = img_sum.repeat(self.out_features, axis=1)
         # print(img_sum.shape)
         batch_size_bias = np.tile(self.bias, (input.shape[0], 1))
         # print(batch_size_bias.shape)
 
-        output = img_sum + batch_size_bias
+        output = img_sum + batch_size_bias  # here, value may drop out of boundary
+        # print(batch_size_bias[0])
+        # print(batch_size_bias[1])
+        # print(batch_size_bias[2])
+        # print(img_sum[:][0])
+        # print()
         # print(output.shape)     # output shape = (batch_size, out_features)
         return output
 
@@ -44,13 +80,15 @@ class Linear(object):
             (20*9, 300*9) -> (500/16, 500/2)
         """
         img_sum = input.sum(axis=1, keepdims=True) # shape = (batch_size,)
-        img_sum /= 9.
 
         # Consider to reuse this block combined with dataset.py's encoding function
-        k = (250 - 31.25) / (300 - 20)
-        img_sum = 31.25 + k * (img_sum - 20)
-        img_sum = img_sum // 10 * 10    # round to multiples of 10
-        return img_sum
+        # k = (250 - 31.25) / (img_sum.max() - img_sum.min())
+        # img_sum = 31.25 + k * (img_sum - img_sum.min())
+        # img_sum = img_sum // 10 * 10    # round to multiples of 10
+        # print(img_sum)
+        ret = rescale(img_sum, 500/16, 500/2, is_round=True)
+        return ret
+
 
 class LossFunc(object):
     """Loss function for this network"""
@@ -68,6 +106,7 @@ class LossFunc(object):
         acc = np.mean(equal_array)
         return acc
 
+
 class Optim(object):
     """Optimization operator, to updata parameters in model"""
     def __init__(self, net):
@@ -80,10 +119,12 @@ class Optim(object):
 
     def update(self, acc, outputs, labels):
         if acc > self.max_acc:
+            print('lager acc')
             self.max_acc = acc
             self.store_bias = self.net.get_parameters()
             self.store_non_label_output_sum = self._calc_non_label_output_sum(outputs, labels)
         else:
+            print(self._accept(outputs, labels))
             if self._accept(outputs, labels) == False:
                 # give up this bias, restore last bias
                 self.net.set_parameters(self.store_bias)
@@ -126,22 +167,27 @@ class Optim(object):
             # print(layer_bias.shape)
             step_info = [random.randint(-base_search_step, base_search_step) * 10 for _ in range(layer_bias.shape[0])]
             layer_bias += step_info
-            new_bias.append(layer_bias)
+            new_bias.append(limit_scale(layer_bias, -250, 250))
+            # print(new_bias)
+            # new_bias.append(layer_bias)
         self.net.set_parameters(new_bias)
+
 
 class Net(object):
     def __init__(self, input_size, layer1_node, num_class):
 
         self.layer1 = Linear(input_size, layer1_node)
+        self.relu = Relu(30, 250)
         self.layer2 = Linear(layer1_node, num_class)
 
     def __call__(self, x):
         return self.forward(x)
 
     def forward(self, x):
-        out1 = self.layer1(x)
-        out2 = self.layer2(out1)
-        return out2
+        out = self.layer1(x)
+        out = self.relu(out)
+        out = self.layer2(out)
+        return out
 
     def get_parameters(self):
         return [self.layer1.bias, self.layer2.bias]

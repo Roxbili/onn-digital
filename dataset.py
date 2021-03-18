@@ -6,7 +6,7 @@ import os
 import cv2
 import matplotlib.pyplot as plt
 
-from utils.save_imgs import save_images
+from utils.utils import save_images, rescale
 
 class MNIST(object):
     def __init__(self, data_dir, kind, shape=None):
@@ -120,10 +120,11 @@ class Feature(object):
         fig.savefig(save_path)
 
     def encoding(self, vector, is_round=False):
-        k = (300 - 20) * 1. / (vector.max() - vector.min())
-        self._fv = 20 + k * (vector - vector.min())
-        if is_round == True:
-            self._fv = self._fv // 10 * 10
+        # k = (300 - 20) * 1. / (vector.max() - vector.min())
+        # self._fv = 20 + k * (vector - vector.min())
+        # if is_round == True:
+        #     self._fv = self._fv // 10 * 10
+        self._fv = rescale(vector, 20, 300, is_round=is_round)
         return (self._fv, self._data['labels'])
 
     def cut_into_batch(self, batch_size, vector, labels):
