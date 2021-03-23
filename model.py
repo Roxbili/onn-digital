@@ -119,18 +119,30 @@ class Optim(object):
 
     def update(self, acc, outputs, labels):
         if acc > self.max_acc:
-            print('lager acc')
+            # print('lager acc')
             self.max_acc = acc
             self.store_bias = self.net.get_parameters()
-            self.store_non_label_output_sum = self._calc_non_label_output_sum(outputs, labels)
+            # self.store_non_label_output_sum = self._calc_non_label_output_sum(outputs, labels)
         else:
-            print(self._accept(outputs, labels))
-            if self._accept(outputs, labels) == False:
+            ######## method 1 ########
+            # print(self._accept(outputs, labels))
+            # if self._accept(outputs, labels) == False:
+            #     # give up this bias, restore last bias
+            #     self.net.set_parameters(self.store_bias)
+            # else:
+            #     # althought acc is smaller, still accept this bias
+            #     self.store_bias = self.net.get_parameters()
+
+            ######## method 2 ########
+            if self._p_accept(0.5) == False:
+                # print('False')
                 # give up this bias, restore last bias
                 self.net.set_parameters(self.store_bias)
             else:
+                # print('True')
                 # althought acc is smaller, still accept this bias
                 self.store_bias = self.net.get_parameters()
+
         # all situation need to step for next bias
         self._step(self.search_step, self.net.get_parameters())
 
@@ -142,6 +154,14 @@ class Optim(object):
         non_label_output_sum = self._calc_non_label_output_sum(outputs, labels)
         if non_label_output_sum < self.store_non_label_output_sum:
             self.store_non_label_output_sum = non_label_output_sum
+            return True
+        else:
+            return False
+
+    def _p_accept(self, p):
+        rand = np.random.rand(1)
+        if rand[0] > p:
+            # accept this change
             return True
         else:
             return False
@@ -166,14 +186,27 @@ class Optim(object):
         for layer_bias in net_bias:
             # print(layer_bias.shape)
             step_info = [random.randint(-base_search_step, base_search_step) * 10 for _ in range(layer_bias.shape[0])]
-            layer_bias += step_info
-            new_bias.append(limit_scale(layer_bias, -250, 250))
+            # print(step_info)
+
+            ######## method 1 ########
+            for i in range(layer_bias.shape[0]):
+                mid_ret = layer_bias[i] + step_info[i]
+                if mid_ret > 300 or mid_ret < 20:
+                    mid_ret = layer_bias[i] - step_info[i]
+                layer_bias[i] = mid_ret
+            new_bias.append(layer_bias)
+
+            ######## method 2 ########
+            # layer_bias += step_info
+            # new_bias.append(limit_scale(layer_bias, -250, 250))
+
             # print(new_bias)
-            # new_bias.append(layer_bias)
         self.net.set_parameters(new_bias)
 
 
-class Net(object):
+
+
+class Net_1(object):
     def __init__(self, input_size, layer1_node, num_class):
 
         self.layer1 = Linear(input_size, layer1_node)
@@ -196,6 +229,34 @@ class Net(object):
         self.layer1.bias = bias[0]
         self.layer2.bias = bias[1]
 
+
+class Net_2(object):
+    def __init__(self, input_size, layer1_node, layer2_node, num_class):
+
+        self.layer1 = Linear(input_size, layer1_node)
+        self.relu = Relu(30, 250)
+        self.layer2 = Linear(layer1_node, layer2_node)
+        self.relu = Relu(30, 250)
+        self.layer3 = Linear(layer2_node, num_class)
+
+    def __call__(self, x):
+        return self.forward(x)
+
+    def forward(self, x):
+        out = self.layer1(x)
+        out = self.relu(out)
+        out = self.layer2(out)
+        out = self.relu(out)
+        out = self.layer3(out)
+        return out
+
+    def get_parameters(self):
+        return [self.layer1.bias, self.layer2.bias, self.layer3.bias]
+
+    def set_parameters(self, bias):
+        self.layer1.bias = bias[0]
+        self.layer2.bias = bias[1]
+        self.layer3.bias = bias[2]
 
 if __name__ == '__main__':
     # layer1 = Linear(9, 5)
