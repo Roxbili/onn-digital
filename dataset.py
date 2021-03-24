@@ -218,10 +218,38 @@ class Feature(object):
                     graph[x][y] = graph[x-1][y] + sum_clo
             self.integ_graph[i] = graph
 
+    def extract_num_class(self, *target):
+        """Extract needed labels and images in target labels
+
+            Args:
+                target: the class to be saved
+        """
+        # make hash dict for 0-9, accelerate finding speed
+        num = range(10)
+        num_bool = [False for _ in num]
+        hash_dict = dict(zip(num, num_bool))
+        for i in target:
+            hash_dict[i] = True
+
+        new_images = []
+        new_labels = []
+        for i in range(self._data['labels'].shape[0]):
+            # if i % 1000 == 0:
+            #     print(i)
+            label = self._data['labels'][i]
+            if hash_dict[label] == True:
+                new_labels.append(self._data['labels'][i])
+                new_images.append(self._data['images'][i])
+        new_images = np.array(new_images, dtype=np.int)
+        new_labels = np.array(new_labels, dtype=np.int)
+        return (new_images, new_labels)
+
 
 if __name__ == '__main__':
-    # train_set = MNIST('mnist', 'train', shape=(10,10))
-    test_set = MNIST('mnist', 't10k', shape=(28,28))
-
-    # print(test_set.data['images'].shape)
-    test_set.save_img('images', 4, mode='img')
+    train_set = MNIST('mnist', 'train', (10, 10))
+    test_set = MNIST('mnist', 't10k', (10, 10))
+    test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
+    test_fv, test_label = test_feature.extract_num_class(0, 1)
+    test_fv = test_fv.reshape(-1, 100)
+    rescale(test_fv, 30, 250, False)
+    input_test_data = test_feature.cut_into_batch(batch_size=1000, vector=test_fv, labels=test_label)
