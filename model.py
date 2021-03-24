@@ -32,9 +32,10 @@ class Relu(object):
         return self.forward(input)
 
     def forward(self, input):
-        tmp = input > self.threshold
-        input[~tmp] = 0
-        output = input.sum(axis=1) // (tmp.sum(axis=1) + 0.001) # output precision
+        x = input.copy()
+        tmp = x > self.threshold
+        x[~tmp] = 0
+        output = x.sum(axis=1) // (tmp.sum(axis=1) + 0.001) # output precision
 
         return output
 
