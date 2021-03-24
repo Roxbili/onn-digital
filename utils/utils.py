@@ -61,4 +61,4 @@ def rescale(input, bottom_line, top_line, is_round=True):
     ret = bottom_line + k * (input - input.min())
     if is_round == True:
         ret = ret // 10 * 10    # round to multiples of 10
-    return ret
+    return ret.astype(np.int)
