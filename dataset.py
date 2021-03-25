@@ -127,7 +127,7 @@ class Feature(object):
         self._fv = rescale(vector, 20, 300, is_round=is_round)
         return (self._fv, self._data['labels'])
 
-    def cut_into_batch(self, batch_size, vector, labels):
+    def cut_into_batch(self, batch_size, vector, labels, num_class, one_hot=False):
         """Cut data into batch_data
             
             Return:
@@ -135,10 +135,11 @@ class Feature(object):
         """
         input_data = []
         for start_batch in range(0, vector.shape[0], batch_size):
-            input_data.append(
-                (vector[start_batch:start_batch+batch_size],
-                labels[start_batch:start_batch+batch_size])
-            )
+            batch_imgs = vector[start_batch:start_batch+batch_size]
+            batch_labels = labels[start_batch:start_batch+batch_size]
+            if one_hot == True:
+                batch_labels = np.eye(num_class)[batch_labels]
+            input_data.append((batch_imgs, batch_labels))
         self.input_data = input_data
         return self.input_data
 

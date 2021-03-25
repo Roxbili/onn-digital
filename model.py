@@ -2,6 +2,8 @@
 
 import numpy as np
 import math
+import os, sys
+import random
 
 from utils.utils import limit_scale, rescale
 
@@ -51,6 +53,7 @@ class Linear(object):
         self.in_features = in_features
         self.out_features = out_features
 
+        # every output node has a relu class
         self.relu = [Relu(in_features) for _ in range(out_features)]
         # print(len(self.relu))
 
@@ -118,7 +121,7 @@ class BatchNorm(object):
         # 对应论文中计算BN的公式
         x_hat = (x - x_mean) / np.sqrt(x_var + self._eps)
         y = self._gamma * x_hat + self._beta
-        print(y)
+        # print(y)
         return self.shift(y)
 
     def shift(self, x, lower_bound=30, upper_bound=250):
@@ -128,7 +131,7 @@ class BatchNorm(object):
         return ret
 
 
-class LossFunc(object):
+class AccFunc(object):
     """Loss function for this network"""
     def __init__(self):
         pass
@@ -146,12 +149,18 @@ class LossFunc(object):
         return self.calc(outputs, labels)
 
     def calc(self, outputs, labels):
-        outputs = outputs.T[0]     # (batch_size,)
-        prediction = np.array(list(map(self._o2prediction, outputs)))
+
+        ########### for one output ###########
+        # outputs = outputs.T[0]     # (batch_size,)
+        # prediction = np.array(list(map(self._o2prediction, outputs)))
         # print('prediction: ', prediction[:10])
         # print('labels:     ', labels[:10])
         # print()
-        equal_array = np.equal(prediction, labels)
+        # equal_array = np.equal(prediction, labels)
+
+        ########### for num_class output ###########
+        equal_array = np.equal(outputs.argmax(axis=1), labels.argmax(axis=1))
+
         acc = np.mean(equal_array)
         return acc
 
@@ -182,6 +191,31 @@ class LossFunc(object):
                 return 0
             else:
                 return 2
+
+
+class CrossEntropyLoss(object):
+    """CrossEntropyLoss function
+    
+        Return:
+            loss: average batch images loss
+    """
+    def __init__(self):
+        self.nx = None
+        self.ny = None
+        self.dnx = None
+
+    def __call__(self, nx, ny):
+        return self.loss(nx, ny)
+
+    def loss(self, nx, ny):
+        self.nx = nx
+        self.ny = ny
+        loss = np.sum(- ny * np.log(nx), axis=1)
+        return loss.mean()
+
+    def backward(self):
+        self.dnx = -1 * self.ny / self.nx
+        return self.dnx
 
 
 class Optim(object):
@@ -263,7 +297,130 @@ class Optim(object):
             return x
 
 
+class Population(object):
+    """Population
+    
+        Args:
+            num: the number of individuals
+    """
+    def __init__(self, num, *layer_node):
+        self.num = num
+        self.popu_params = self._init_param(num, layer_node)
+        self.best_params = None
 
+    def _init_param(self, num, layer_node, lower_bound=30, upper_bound=250):
+        """Init population"""
+        popu_params = []
+        length = len(layer_node)
+        for _ in range(num):    # the number of individuals
+            layers_params = []
+            for i in range(length):
+                if i + 1 >= length:
+                    break
+                out_features = layer_node[i+1]
+                in_features = layer_node[i]
+                param = np.random.randint(lower_bound, upper_bound, (out_features, in_features))
+                layers_params.append(param)
+            popu_params.append(layers_params)
+        return popu_params
+
+    def update_popu(self, params):
+        self.popu_params = params
+
+    def get_all_params(self):
+        return self.popu_params
+
+    def _fitness(self, loss):
+        """Fitness function"""
+        return np.array(list(map(lambda x: 1 / x, loss)))
+
+    def select(self, loss):
+        fit_val = self._fitness(loss)
+        num2next = self.num * fit_val / fit_val.sum()
+        integer = num2next.astype(np.int)
+        decimal = num2next - integer
+        # print(integer)
+        # print(decimal)
+
+        new_popu_params = []
+        
+        for i in range(num2next.shape[0]):
+            cp_num = integer[i]
+            layers_params = self.popu_params[i]
+            for _ in range(cp_num):
+                new_popu_params.append(layers_params)
+        
+        sort_index = np.argsort(-decimal)
+        for i in range(self.num - len(new_popu_params)):    # fill population to M
+            layers_params = self.popu_params[sort_index[i]]
+            new_popu_params.append(layers_params)
+        
+        # shuffle the populaltion
+        random.shuffle(new_popu_params)
+        # individuals to be saved
+        self.popu_params = new_popu_params
+
+    def crossover(self, x, y):
+        """One-point Crossover"""
+
+        ############# line crossover #############
+        assert len(x) == len(y)
+        child_1 = []
+        child_2 = []
+        for layer_num in range(len(x)):
+            x_layer_params = x[layer_num]   # shape = (out_size, in_size)
+            y_layer_params = y[layer_num]
+
+            # exchange
+            cut_pos = random.randint(0, x_layer_params.shape[0])    # create cut position
+            child_1.append(np.concatenate((x_layer_params[:cut_pos], y_layer_params[cut_pos:]), axis=0))
+            child_2.append(np.concatenate((y_layer_params[:cut_pos], x_layer_params[cut_pos:]), axis=0))
+            # print(child_1.shape)
+            # print(child_2.shape)
+        return (child_1, child_2)
+
+    def mutation(self, x, lower_bound=30, upper_bound=250):
+        """Simple mutation
+
+            This function will change the x
+        """
+        
+        ############# element mutation #############
+        layer_param_num = []
+        for layer_params in x:
+            layer_param_num.append(layer_params.shape)
+        # create mutation position and value
+        pos_layer = random.randint(0, len(layer_param_num) - 1)
+        mu_pos_x = random.randint(0, layer_param_num[pos_layer][0] - 1)
+        mu_pos_y = random.randint(0, layer_param_num[pos_layer][1] - 1)
+        mu_val = random.randint(lower_bound, upper_bound)
+
+        # mutation begin, this will change the x array
+        x[pos_layer][mu_pos_x][mu_pos_y] = mu_val
+
+    def record_best(self, index):
+        self.best_params = self.popu_params[index]
+
+    def save_best(self, acc, dir='log'):
+        """Save the parameters of all layers to each .npy format
+
+            Args:
+                acc: the training accuracy of the result of parameters
+                dir: the diretory to save the parameters, default='log'
+        """
+        acc *= 100
+        dir_path = os.path.join(dir, str('%.2f' % acc))
+        if not os.path.exists(dir_path):
+            os.mkdir(dir_path)
+
+        for i, layer_params in enumerate(self.best_params):
+            np.save(os.path.join(dir_path, 'layer%d.npy' % i), layer_params)
+
+        print('save completed')
+
+###########################################################################
+################################# Network #################################
+###########################################################################
 
 class Net_1(object):
     def __init__(self, input_size, layer1_node, output_size):
@@ -274,7 +431,11 @@ class Net_1(object):
         return self.forward(x)
 
     def forward(self, x):
+        # print(x.shape)
+        # print(x[:3])
         out = self.layer1(x)
+        # print(out[:3])
+        # sys.exit(0)
         out = self.layer2(out)
         return out
 
