@@ -95,7 +95,7 @@ criterion = CrossEntropyLoss()
 ############### Resume ###############
 
 if args.resume_dir != None:
-    npy_path = list(map(lambda x: os.path.join(args.resume_dir, x), os.listdir(args.resume_dir)))
+    npy_path = sorted(list(map(lambda x: os.path.join(args.resume_dir, x), os.listdir(args.resume_dir))))
     best_params = []
     for item_path in npy_path:
         best_params.append(np.load(item_path))

@@ -85,6 +85,8 @@ class Linear(object):
 
     def set_parameters(self, threshold):
         """Set parameters"""
+        # print(threshold.shape[0])
+        # print(len(self.relu))
         for i in range(threshold.shape[0]):
             self.relu[i].threshold = threshold[i]
 
