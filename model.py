@@ -401,7 +401,7 @@ class Population(object):
     def record_best(self, index):
         self.best_params = self.popu_params[index]
 
-    def save_best(self, acc, dir='log'):
+    def save_best(self, acc, num_class, dir='log'):
         """Save the parameters of all layers to each .npy format
 
             Args:
@@ -409,7 +409,7 @@ class Population(object):
                 dir: the diretory to save the parameters, default='log'
         """
         acc *= 100
-        dir_path = os.path.join(dir, str('%.2f' % acc))
+        dir_path = os.path.join(dir, str('%.2f' % acc) + '_' + str(num_class))
         if not os.path.exists(dir_path):
             os.mkdir(dir_path)
 

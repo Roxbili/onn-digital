@@ -34,9 +34,10 @@ parser.add_argument('--epoch', type=int, help='Trainging epoch.')
 parser.add_argument('--popu_num', type=int, help='The number of population each epoch')
 parser.add_argument('--mu_p', type=float, help='The mutation probability is 1-mu_p')
 parser.add_argument('--resume_dir', type=str, default=None, help='Reload pre-training parameters, please input directory.')
-parser.add_argument('--running_mode', type=str, default='train', help='running mode, train | test. Default: train')
+parser.add_argument('--running_mode', type=str, default='train', help='Running mode, train | test. Default: train')
+parser.add_argument('--class_list', type=int, nargs="+", default=[0,1], help='Class in dataset.')
 args = parser.parse_args()
-    
+
 ############### logger ###############
 base = os.path.basename(__file__)
 time_ = time.strftime("_%Y%m%d_%H%M%S", time.localtime()) 
@@ -56,28 +57,29 @@ train_feature = Feature(train_set.data, kernel_size=(4,4), stride=(3,3))
 train_fv = train_feature._data['images'].reshape(-1, 100)         # 10 class, 100 input
 rescale(train_fv, 30, 250, False)
 train_label = train_feature._data['labels']
-input_train_data = train_feature.cut_into_batch(batch_size=1000, vector=train_fv, labels=train_label)
+input_train_data = train_feature.cut_into_batch(batch_size=args.batch_size, vector=train_fv, labels=train_label)
 
 test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
 test_fv = test_feature._data['images'].reshape(-1, 100)           # 10 class, 100 input
 rescale(test_fv, 30, 250, False)
 test_label = test_feature._data['labels']
-input_test_data = test_feature.cut_into_batch(batch_size=1000, vector=test_fv, labels=test_label)
+input_test_data = test_feature.cut_into_batch(batch_size=args.batch_size, vector=test_fv, labels=test_label)
 '''
 
+# any class
 train_feature = Feature(train_set.data, kernel_size=(4,4), stride=(3,3))
-train_fv, train_label = train_feature.extract_num_class(0, 1)
+train_fv, train_label = train_feature.extract_num_class(args.class_list)
 # print(train_fv.shape)
 # print(train_label.shape)
 train_fv = train_fv.reshape(-1, 100)
 rescale(train_fv, 30, 250, False)
-input_train_data = train_feature.cut_into_batch(batch_size=1000, vector=train_fv, labels=train_label, num_class=args.output_size, one_hot=True)
+input_train_data = train_feature.cut_into_batch(batch_size=args.batch_size, vector=train_fv, labels=train_label, num_class=args.output_size, one_hot=True)
 
 test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
-test_fv, test_label = test_feature.extract_num_class(0, 1)
+test_fv, test_label = test_feature.extract_num_class(args.class_list)
 test_fv = test_fv.reshape(-1, 100)
 rescale(test_fv, 30, 250, False)
-input_test_data = test_feature.cut_into_batch(batch_size=1000, vector=test_fv, labels=test_label, num_class=args.output_size, one_hot=True)
+input_test_data = test_feature.cut_into_batch(batch_size=args.batch_size, vector=test_fv, labels=test_label, num_class=args.output_size, one_hot=True)
 
 
 ############### model define ###############
@@ -164,7 +166,7 @@ if args.running_mode == 'train':
             individuals.update_popu(new_popu_params)
 
     # Save best parameters 
-    individuals.save_best(max_acc, 'log')
+    individuals.save_best(max_acc, num_class=args.output_size, dir='log')
 
 
 ############### test ###############

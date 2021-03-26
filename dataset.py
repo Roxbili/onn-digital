@@ -138,7 +138,7 @@ class Feature(object):
             batch_imgs = vector[start_batch:start_batch+batch_size]
             batch_labels = labels[start_batch:start_batch+batch_size]
             if one_hot == True:
-                batch_labels = np.eye(num_class)[batch_labels]
+                batch_labels = np.eye(num_class)[batch_labels]  # subsequent numbers, which begins with 0
             input_data.append((batch_imgs, batch_labels))
         self.input_data = input_data
         return self.input_data
@@ -219,18 +219,20 @@ class Feature(object):
                     graph[x][y] = graph[x-1][y] + sum_clo
             self.integ_graph[i] = graph
 
-    def extract_num_class(self, *target):
+    def extract_num_class(self, target):
         """Extract needed labels and images in target labels
 
             Args:
                 target: the class to be saved
         """
+        assert type(target) == list
         # make hash dict for 0-9, accelerate finding speed
         num = range(10)
         num_bool = [False for _ in num]
         hash_dict = dict(zip(num, num_bool))
         for i in target:
             hash_dict[i] = True
+        label_encode = dict(zip(target, range(len(target))))    # {0: 0, 1: 1, 4: 2, 7: 3}
 
         new_images = []
         new_labels = []
@@ -239,7 +241,7 @@ class Feature(object):
             #     print(i)
             label = self._data['labels'][i]
             if hash_dict[label] == True:
-                new_labels.append(self._data['labels'][i])
+                new_labels.append(label_encode[label])
                 new_images.append(self._data['images'][i])
         new_images = np.array(new_images, dtype=np.int)
         new_labels = np.array(new_labels, dtype=np.int)
@@ -247,10 +249,11 @@ class Feature(object):
 
 
 if __name__ == '__main__':
-    train_set = MNIST('mnist', 'train', (10, 10))
-    test_set = MNIST('mnist', 't10k', (10, 10))
-    test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
-    test_fv, test_label = test_feature.extract_num_class(0, 1)
-    test_fv = test_fv.reshape(-1, 100)
-    rescale(test_fv, 30, 250, False)
-    input_test_data = test_feature.cut_into_batch(batch_size=1000, vector=test_fv, labels=test_label)
+    # train_set = MNIST('mnist', 'train', (10, 10))
+    # test_set = MNIST('mnist', 't10k', (10, 10))
+    # test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
+    # test_fv, test_label = test_feature.extract_num_class(0, 1)
+    # test_fv = test_fv.reshape(-1, 100)
+    # rescale(test_fv, 30, 250, False)
+    # input_test_data = test_feature.cut_into_batch(batch_size=1000, vector=test_fv, labels=test_label)
+    pass
