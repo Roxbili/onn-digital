@@ -169,7 +169,7 @@ if args.running_mode == 'train':
     # Save best parameters 
     individuals.save_best(max_acc, num_class=args.output_size, dir='log')
 
-logger('Training time: %f' % time.time() - start_time)
+logger('Training time: %f' % (time.time() - start_time))
 
 ############### test ###############
 '''Both training and testing will exacute this block'''
@@ -187,4 +187,4 @@ for i, (images, labels) in enumerate(input_test_data):
     acc_collecter.append(acc)
 
 logger('Testing accuracy: %.2f' % (np.mean(acc_collecter) * 100))
-logger('Testing time: %f' % time.time() - start_time)
+logger('Testing time: %f' % (time.time() - start_time))
