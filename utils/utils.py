@@ -4,6 +4,7 @@ from multiprocessing import Pool
 import matplotlib.pyplot as plt
 import os
 import numpy as np
+import logging
 
 
 ######################### images #########################
@@ -95,3 +96,15 @@ def softmax(x):
     
     assert x.shape == orig_shape
     return x
+
+
+class Message(object):
+    """Log message"""
+    def __init__(self, log_path):
+        LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+        logging.basicConfig(filename=log_path, level=logging.DEBUG, format=LOG_FORMAT)
+        self.logger = logging.getLogger(__name__)
+
+    def __call__(self, msg):
+        print(msg)
+        self.logger.info(msg)

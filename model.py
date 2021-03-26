@@ -417,6 +417,9 @@ class Population(object):
             np.save(os.path.join(dir_path, 'layer%d.npy' % i), layer_params)
 
         print('save completed')
+    
+    def get_best(self):
+        return self.best_params
 
 ###########################################################################
 ################################# Network #################################
