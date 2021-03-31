@@ -307,6 +307,7 @@ class Population(object):
     """
     def __init__(self, num, *layer_node):
         self.num = num
+        self.layer_node = layer_node
         self.popu_params = self._init_param(num, layer_node)
         self.best_params = None
 
@@ -362,23 +363,77 @@ class Population(object):
         # individuals to be saved
         self.popu_params = new_popu_params
 
-    def crossover(self, x, y):
-        """One-point Crossover"""
+    def crossover(self, x, y, mode='one_point', grained='fine'):
+        """One-point Crossover
+        
+            Args:
+                x, y: parentes
+                mode: one_point | two_point
+                grained: coarse | fine
+        """
 
-        ############# line crossover #############
         assert len(x) == len(y)
         child_1 = []
         child_2 = []
-        for layer_num in range(len(x)):
-            x_layer_params = x[layer_num]   # shape = (out_size, in_size)
-            y_layer_params = y[layer_num]
 
-            # exchange
-            cut_pos = random.randint(0, x_layer_params.shape[0])    # create cut position
-            child_1.append(np.concatenate((x_layer_params[:cut_pos], y_layer_params[cut_pos:]), axis=0))
-            child_2.append(np.concatenate((y_layer_params[:cut_pos], x_layer_params[cut_pos:]), axis=0))
-            # print(child_1.shape)
-            # print(child_2.shape)
+        if mode == 'one_point':
+            '''output node crossover'''
+            for layer_num in range(len(x)):
+                x_layer_params = x[layer_num]   # shape = (out_size, in_size)
+                y_layer_params = y[layer_num]
+
+                # exchange
+                if grained == 'coarse':
+                    cut_pos = random.randint(0, x_layer_params.shape[0])    # create cut position
+                    child_1.append(np.concatenate((x_layer_params[:cut_pos], y_layer_params[cut_pos:]), axis=0))
+                    child_2.append(np.concatenate((y_layer_params[:cut_pos], x_layer_params[cut_pos:]), axis=0))
+                    # print(child_1.shape)
+                    # print(child_2.shape)
+                elif grained == 'fine':
+                    # reshape
+                    x_layer_params_shape = x_layer_params.shape
+                    y_layer_params_shape = y_layer_params.shape
+                    x_layer_params = x_layer_params.reshape(-1)
+                    y_layer_params = y_layer_params.reshape(-1)
+
+                    # exchange
+                    cut_pos = random.randint(0, x_layer_params_shape[0])
+                    x_child = np.concatenate((x_layer_params[:cut_pos], y_layer_params[cut_pos:]))
+                    y_child = np.concatenate((y_layer_params[:cut_pos], x_layer_params[cut_pos:]))
+
+                    # re-reshape
+                    child_1.append(x_child.reshape(x_layer_params_shape))
+                    child_2.append(y_child.reshape(y_layer_params_shape))
+
+        elif mode == 'two_point':
+            '''one layer node crossover'''
+            for layer_num in range(len(x)):
+                x_layer_params = x[layer_num]   # shape = (out_size, in_size)
+                y_layer_params = y[layer_num]
+
+                if grained == 'coarse':
+                    cut_pos = np.random.randint(0, x_layer_params.shape[0], 2)
+                    cut_pos.sort()
+                    child_1.append(np.concatenate((x_layer_params[:cut_pos[0]], y_layer_params[cut_pos[0]:cut_pos[1]], x_layer_params[cut_pos[1]:]), axis=0))
+                    child_2.append(np.concatenate((y_layer_params[:cut_pos[0]], x_layer_params[cut_pos[0]:cut_pos[1]], y_layer_params[cut_pos[1]:]), axis=0))
+
+                elif grained == 'fine':
+                    # reshape
+                    x_layer_params_shape = x_layer_params.shape
+                    y_layer_params_shape = y_layer_params.shape
+                    x_layer_params = x_layer_params.reshape(-1)
+                    y_layer_params = y_layer_params.reshape(-1)
+
+                    # exchange
+                    cut_pos = np.random.randint(0, x.layer_params.shape[0], 2)
+                    cut_pos.sort()
+                    x_child = np.concatenate((x_layer_params[:cut_pos[0]], y_layer_params[cut_pos[0]:cut_pos[1]], x_layer_params[cut_pos[1]:]))
+                    y_child = np.concatenate((y_layer_params[:cut_pos[0]], x_layer_params[cut_pos[0]:cut_pos[1]], y_layer_params[cut_pos[1]:]))
+                    
+                    # re-reshape
+                    child_1.append(x_child.reshape(x_layer_params_shape))
+                    child_2.append(y_child.reshape(y_layer_params_shape))
+
         return (child_1, child_2)
 
     def mutation(self, x, lower_bound=30, upper_bound=250):
@@ -412,6 +467,9 @@ class Population(object):
         """
         acc *= 100
         dir_path = os.path.join(dir, str('%.2f' % acc) + '_' + str(num_class))
+        for layer_size in self.layer_node:
+            dir_path += '_' + str(layer_size)
+            
         if not os.path.exists(dir_path):
             os.mkdir(dir_path)
 

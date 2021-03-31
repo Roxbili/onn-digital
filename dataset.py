@@ -219,13 +219,20 @@ class Feature(object):
                     graph[x][y] = graph[x-1][y] + sum_clo
             self.integ_graph[i] = graph
 
-    def extract_num_class(self, target):
+    def extract_num_class(self, target, images=[], labels=[]):
         """Extract needed labels and images in target labels
 
             Args:
                 target: the class to be saved
+                images: the image data
+                labels: the image label
         """
         assert type(target) == list
+        if len(images) == 0:
+            images = self._data['images']
+        if len(labels) == 0:
+            labels = self._data['labels']
+
         # make hash dict for 0-9, accelerate finding speed
         num = range(10)
         num_bool = [False for _ in num]
@@ -236,13 +243,13 @@ class Feature(object):
 
         new_images = []
         new_labels = []
-        for i in range(self._data['labels'].shape[0]):
+        for i in range(labels.shape[0]):
             # if i % 1000 == 0:
             #     print(i)
-            label = self._data['labels'][i]
+            label = labels[i]
             if hash_dict[label] == True:
                 new_labels.append(label_encode[label])
-                new_images.append(self._data['images'][i])
+                new_images.append(images[i])
         new_images = np.array(new_images, dtype=np.int)
         new_labels = np.array(new_labels, dtype=np.int)
         return (new_images, new_labels)
