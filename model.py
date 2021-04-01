@@ -430,7 +430,7 @@ class Population(object):
                     y_layer_params = y_layer_params.reshape(-1)
 
                     # exchange
-                    cut_pos = np.random.randint(0, x.layer_params.shape[0], 2)
+                    cut_pos = np.random.randint(0, x_layer_params.shape[0], 2)
                     cut_pos.sort()
                     x_child = np.concatenate((x_layer_params[:cut_pos[0]], y_layer_params[cut_pos[0]:cut_pos[1]], x_layer_params[cut_pos[1]:]))
                     y_child = np.concatenate((y_layer_params[:cut_pos[0]], x_layer_params[cut_pos[0]:cut_pos[1]], y_layer_params[cut_pos[1]:]))
