@@ -71,13 +71,13 @@ train_feature = Feature(train_set.data, kernel_size=(4,4), stride=(3,3))
 train_fv, train_label = train_feature.extract_num_class(args.class_list)
 train_fv = train_fv.reshape(-1, 100)
 rescale(train_fv, 30, 250, False)
-input_train_data = train_feature.cut_into_batch(batch_size=args.batch_size, vector=train_fv, labels=train_label, num_class=args.output_size, one_hot=True)
+input_train_data = train_feature.cut_into_batch(batch_size=args.batch_size, vector=train_fv, labels=train_label, num_class=args.output_size, one_hot=True, shuffle=True)
 
 test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
 test_fv, test_label = test_feature.extract_num_class(args.class_list)
 test_fv = test_fv.reshape(-1, 100)
 rescale(test_fv, 30, 250, False)
-input_test_data = test_feature.cut_into_batch(batch_size=args.batch_size, vector=test_fv, labels=test_label, num_class=args.output_size, one_hot=True)
+input_test_data = test_feature.cut_into_batch(batch_size=args.batch_size, vector=test_fv, labels=test_label, num_class=args.output_size, one_hot=True, shuffle=True)
 
 
 '''# 9 input
@@ -133,13 +133,13 @@ if args.running_mode == 'train':
     for _ in range(args.epoch):
         logger("Epoch: %d" % _)
 
-        # every 5 epoch, change population to best one
-        if (_ + 1) % 5 == 0:
-            best_param = individuals.get_best()
-            popu_params = []
-            for i in range(args.popu_num):
-                popu_params.append(best_param)
-            individuals.update_popu(popu_params)
+        # # every 5 epoch, change population to best one
+        # if (_ + 1) % 5 == 0:
+        #     best_param = individuals.get_best()
+        #     popu_params = []
+        #     for i in range(args.popu_num):
+        #         popu_params.append(best_param)
+        #     individuals.update_popu(popu_params)
 
         for i, (images, labels) in enumerate(input_train_data):
             if images.shape[0] != args.batch_size:

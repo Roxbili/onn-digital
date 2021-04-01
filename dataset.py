@@ -127,12 +127,17 @@ class Feature(object):
         self._fv = rescale(vector, 20, 300, is_round=is_round)
         return (self._fv, self._data['labels'])
 
-    def cut_into_batch(self, batch_size, vector, labels, num_class, one_hot=False):
+    def cut_into_batch(self, batch_size, vector, labels, num_class, one_hot=False, shuffle=False):
         """Cut data into batch_data
             
             Return:
                 input_data: a dict, use input_data['data'] and input_data['labels']
         """
+        if shuffle == True:
+            permutation = np.random.permutation(vector.shape[0])
+            vector = vector[permutation]
+            labels = labels[permutation]
+
         input_data = []
         for start_batch in range(0, vector.shape[0], batch_size):
             batch_imgs = vector[start_batch:start_batch+batch_size]

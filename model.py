@@ -353,11 +353,16 @@ class Population(object):
             for _ in range(cp_num):
                 new_popu_params.append(layers_params)
         
-        sort_index = np.argsort(-decimal)
-        for i in range(self.num - len(new_popu_params)):    # fill population to M
-            layers_params = self.popu_params[sort_index[i]]
-            new_popu_params.append(layers_params)
+        # # use decimal order to fill population
+        # sort_index = np.argsort(-decimal)
+        # for i in range(self.num - len(new_popu_params)):    # fill population to M
+        #     layers_params = self.popu_params[sort_index[i]]
+        #     new_popu_params.append(layers_params)
         
+        # use best individual to fill population
+        for i in range(self.num - len(new_popu_params)):
+            new_popu_params.append(self.best_params)
+
         # shuffle the populaltion
         random.shuffle(new_popu_params)
         # individuals to be saved
