@@ -481,7 +481,7 @@ class Population(object):
         for i, layer_params in enumerate(self.best_params):
             np.save(os.path.join(dir_path, 'layer%d.npy' % i), layer_params)
 
-        print('save completed')
+        print('save completed, save path: {}'.format(dir_path))
     
     def get_best(self):
         return self.best_params
