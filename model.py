@@ -7,6 +7,11 @@ import random
 
 from utils.utils import limit_scale, rescale
 
+
+f = range(50, 210, 10)
+c = range(4, 20, 1)
+f2c = dict(zip(f, c))   # frequency to counter number
+
 class Relu(object):
     """Relu layer
     
@@ -17,28 +22,38 @@ class Relu(object):
             lower_bound: the lower bound of threshold
             upper_bound: the upper bound of threshold
     """
-    def __init__(self, in_features, lower_bound=30, upper_bound=60):
-        self.threshold = np.random.randint(lower_bound, upper_bound, in_features)   # shape = (in_features,)
+    def __init__(self):
+        pass
 
-    def __call__(self, input):
+    def __call__(self, inputs):
         """Forward network
 
             Return the result of one output neuron
 
             Args:
-                input: shape=(batch_size, layer_shape)
+                inputs: shape=(batch_size, layer_shape)
 
             Return:
                 output: shape=(batch_size,), type=np.array
         """
-        return self.forward(input)
+        return self.forward(inputs)
 
-    def forward(self, input):
-        x = input.copy()
-        tmp = x > self.threshold
-        x[~tmp] = 0
-        output = x.sum(axis=1) // (tmp.sum(axis=1) + 0.001) # output precision
+    def forward(self, inputs):
+        output = np.copy(inputs)
+        output[output < 0] = 0
+        return output
 
+
+class Mapping(object):
+    def __init__(self, input_node):
+        self.input_node = input_node
+
+    def __call__(self, inputs):
+        return self.forward(inputs)
+
+    def forward(self, inputs):
+        output = inputs // (4 * self.input_node)
+        output = (output + 5) * 10  # return (50, 200)
         return output
 
 
@@ -52,85 +67,29 @@ class Linear(object):
     def __init__(self, in_features, out_features):
         self.in_features = in_features
         self.out_features = out_features
+        self.bias = 3
 
-        # every output node has a relu class
-        self.relu = [Relu(in_features) for _ in range(out_features)]
-        # print(len(self.relu))
+    def __call__(self, inputs, w):
+        return self.forward(inputs, w)
 
-    def __call__(self, input):
-        return self.forward(input)
-
-    def forward(self, input):
+    def forward(self, inputs, w):
         """Forward network
 
             Args:
-                input: shape=(batch_size, in_features)
+                inputs: shape=(batch_size, in_features)
             
             Return:
                 output: shape=(batch_size, out_features), type=np.array
         """
-        output = np.zeros((self.out_features, input.shape[0]), dtype=np.int)  # transpose when return, here is convenient for assignment
-        for i in range(self.out_features):
-            output[i] = self.relu[i](input)
-        return output.T
+        # change frequency to counter number
+        shape = inputs.shape
+        output = inputs.reshape(-1)
+        output = np.array([f2c[x] for x in output])
+        output = output.reshape(shape)
 
-    def parameters(self):
-        """Get parameters
-
-            Return:
-                threshold: shape=(out_features, in_features), type=np.array
-        """
-        threshold = np.array([self.relu[i].threshold for i in range(self.out_features)])
-        return threshold
-
-    def set_parameters(self, threshold):
-        """Set parameters"""
-        # print(threshold.shape[0])
-        # print(len(self.relu))
-        for i in range(threshold.shape[0]):
-            self.relu[i].threshold = threshold[i]
-
-
-class BatchNorm(object):
-    def __init__(self, momentum, eps, num_features):
-        """Init parameters
-
-            Args:
-                momentum: 追踪样本整体均值和方差的动量
-                eps: 防止数值计算错误
-                num_features: 特征数量
-        """
-        # 对每个batch的mean和var进行追踪统计
-        self._running_mean = 0
-        self._running_var = 1
-        # 更新self._running_xxx时的动量
-        self._momentum = momentum
-        # 防止分母计算为0
-        self._eps = eps
-        # 对应论文中需要更新的beta和gamma，采用pytorch文档中的初始化值
-        self._beta = np.zeros(shape=(num_features, ))
-        self._gamma = np.ones(shape=(num_features, ))
-
-    def __call__(self, x):
-        return self.forward(x)
-
-    def forward(self, x):
-        x_mean = x.mean(axis=0)
-        x_var = x.var(axis=0)
-        # 对应running_mean的更新公式
-        self._running_mean = (1 - self._momentum) * x_mean + self._momentum * self._running_mean
-        self._running_var = (1 - self._momentum) * x_var + self._momentum * self._running_var
-        # 对应论文中计算BN的公式
-        x_hat = (x - x_mean) / np.sqrt(x_var + self._eps)
-        y = self._gamma * x_hat + self._beta
-        # print(y)
-        return self.shift(y)
-
-    def shift(self, x, lower_bound=30, upper_bound=250):
-        """Shift x to (lower_bound, upper_bound)"""
-        k = 220
-        ret = lower_bound + k * x
-        return ret
+        output = np.matmul(output, w)
+        output += self.bias
+        return output
 
 
 class AccFunc(object):
@@ -143,7 +102,7 @@ class AccFunc(object):
 
             Args:
                 outputs: shape=(batch_size, 1)
-                labels: shape=(batch_size,)
+                labels: shape=(batch_size, num_class)
         """
         # self.outputs = outputs
         # self.labels = labels
@@ -224,267 +183,17 @@ class Optim(object):
     """Optimization operator, to updata parameters in model"""
     def __init__(self, net):
         self.net = net
-        self.search_step = None
-        self.T = None
-
-        self._acc = 0
-        self.store_params = None
-        self.max_acc = 0
-
-    def update(self, acc, outputs, labels):
-        # recode max accuracy
-        if acc > self.max_acc:
-            print(acc)
-            self.max_acc = acc
-
-        # update parameters
-        delta_t = self._acc - acc
-        if delta_t < 0 or self._accept(delta_t) == True:
-            # print('lager acc', acc)
-            self._acc = acc
-            self.store_params = self.net.get_parameters()
-        else:
-            self.net.set_parameters(self.store_params)
-
-        # all situation need to step for next bias
-        self._step(self.search_step, self.net.get_parameters())
-
-    def _accept(self, delta_t):
-        p = math.exp(-delta_t / self.T)
-        # print(p)
-        rand = np.random.rand(1)
-        if p > rand[0]:
-            # accept this change
-            return True
-        else:
-            return False
-
-    def _step(self, search_step, net_params):
-        """Update bias
-
-            Args: the range of search area. If search_step = 300 means init position.
-        """
-        base_search_step = search_step // 10
-        # print(base_search_step)
-        new_params = []
-        for layer_params in net_params:
-            # print(layer_bias.shape)
-            # step_info = [random.randint(-base_search_step, base_search_step) * 10 for _ in range(layer_bias.shape[0])]
-            step_info = np.random.randint(-base_search_step, base_search_step, layer_params.shape)
-            step_info *= 10
-            # print(step_info[:3])
-            layer_params += step_info
-            # print(layer_params.shape)
-            for i in range(layer_params.shape[0]):
-                layer_params[i] = np.array(list(map(self._HT, layer_params[i])))
-
-            new_params.append(layer_params)
-        self.net.set_parameters(new_params)
-
-    def _HT(self, x, lower_bound=30, upper_bound=250):
-        """HT function
-
-            HT(x) = {
-                x, lower_bound <= x <= upper_bound
-                upper_bound, x > upper_bound
-                lower_bound, x < lower_bound
-            }
-        """
-        # print(x.shape)
-        if x < lower_bound:
-            return lower_bound
-        elif x > upper_bound:
-            return upper_bound
-        else:
-            return x
-
-
-class Population(object):
-    """Population
     
-        Args:
-            num: the number of individuals
-    """
-    def __init__(self, num, *layer_node):
-        self.num = num
-        self.layer_node = layer_node
-        self.popu_params = self._init_param(num, layer_node)
-        self.best_params = None
+    def step(self):
+        pass
 
-    def _init_param(self, num, layer_node, lower_bound=30, upper_bound=250):
-        """Init population"""
-        popu_params = []
-        length = len(layer_node)
-        for _ in range(num):    # the number of individuals
-            layers_params = []
-            for i in range(length):
-                if i + 1 >= length:
-                    break
-                out_features = layer_node[i+1]
-                in_features = layer_node[i]
-                param = np.random.randint(lower_bound, upper_bound, (out_features, in_features))
-                layers_params.append(param)
-            popu_params.append(layers_params)
-        return popu_params
 
-    def update_popu(self, params):
-        self.popu_params = params
+def softmax(x):
+    """Compute the softmax of vector x."""
+    exp_x = np.exp(x)
+    softmax_x = exp_x / np.sum(exp_x)
+    return softmax_x 
 
-    def get_all_params(self):
-        return self.popu_params
-
-    def _fitness(self, loss):
-        """Fitness function"""
-        return np.array(list(map(lambda x: 1 / x, loss)))
-
-    def select(self, loss):
-        fit_val = self._fitness(loss)
-        num2next = self.num * fit_val / fit_val.sum()
-        integer = num2next.astype(np.int)
-        decimal = num2next - integer
-        # print(integer)
-        # print(decimal)
-
-        new_popu_params = []
-        
-        for i in range(num2next.shape[0]):
-            cp_num = integer[i]
-            layers_params = self.popu_params[i]
-            for _ in range(cp_num):
-                new_popu_params.append(layers_params)
-        
-        # # use decimal order to fill population
-        # sort_index = np.argsort(-decimal)
-        # for i in range(self.num - len(new_popu_params)):    # fill population to M
-        #     layers_params = self.popu_params[sort_index[i]]
-        #     new_popu_params.append(layers_params)
-        
-        # use best individual to fill population
-        for i in range(self.num - len(new_popu_params)):
-            new_popu_params.append(self.best_params)
-
-        # shuffle the populaltion
-        random.shuffle(new_popu_params)
-        # individuals to be saved
-        self.popu_params = new_popu_params
-
-    def crossover(self, x, y, mode='one_point', grained='fine'):
-        """One-point Crossover
-        
-            Args:
-                x, y: parentes
-                mode: one_point | two_point
-                grained: coarse | fine
-        """
-
-        assert len(x) == len(y)
-        child_1 = []
-        child_2 = []
-
-        if mode == 'one_point':
-            '''output node crossover'''
-            for layer_num in range(len(x)):
-                x_layer_params = x[layer_num]   # shape = (out_size, in_size)
-                y_layer_params = y[layer_num]
-
-                # exchange
-                if grained == 'coarse':
-                    cut_pos = random.randint(0, x_layer_params.shape[0])    # create cut position
-                    child_1.append(np.concatenate((x_layer_params[:cut_pos], y_layer_params[cut_pos:]), axis=0))
-                    child_2.append(np.concatenate((y_layer_params[:cut_pos], x_layer_params[cut_pos:]), axis=0))
-                    # print(child_1.shape)
-                    # print(child_2.shape)
-                elif grained == 'fine':
-                    # reshape
-                    x_layer_params_shape = x_layer_params.shape
-                    y_layer_params_shape = y_layer_params.shape
-                    x_layer_params = x_layer_params.reshape(-1)
-                    y_layer_params = y_layer_params.reshape(-1)
-
-                    # exchange
-                    cut_pos = random.randint(0, x_layer_params_shape[0])
-                    x_child = np.concatenate((x_layer_params[:cut_pos], y_layer_params[cut_pos:]))
-                    y_child = np.concatenate((y_layer_params[:cut_pos], x_layer_params[cut_pos:]))
-
-                    # re-reshape
-                    child_1.append(x_child.reshape(x_layer_params_shape))
-                    child_2.append(y_child.reshape(y_layer_params_shape))
-
-        elif mode == 'two_point':
-            '''one layer node crossover'''
-            for layer_num in range(len(x)):
-                x_layer_params = x[layer_num]   # shape = (out_size, in_size)
-                y_layer_params = y[layer_num]
-
-                if grained == 'coarse':
-                    cut_pos = np.random.randint(0, x_layer_params.shape[0], 2)
-                    cut_pos.sort()
-                    child_1.append(np.concatenate((x_layer_params[:cut_pos[0]], y_layer_params[cut_pos[0]:cut_pos[1]], x_layer_params[cut_pos[1]:]), axis=0))
-                    child_2.append(np.concatenate((y_layer_params[:cut_pos[0]], x_layer_params[cut_pos[0]:cut_pos[1]], y_layer_params[cut_pos[1]:]), axis=0))
-
-                elif grained == 'fine':
-                    # reshape
-                    x_layer_params_shape = x_layer_params.shape
-                    y_layer_params_shape = y_layer_params.shape
-                    x_layer_params = x_layer_params.reshape(-1)
-                    y_layer_params = y_layer_params.reshape(-1)
-
-                    # exchange
-                    cut_pos = np.random.randint(0, x_layer_params.shape[0], 2)
-                    cut_pos.sort()
-                    x_child = np.concatenate((x_layer_params[:cut_pos[0]], y_layer_params[cut_pos[0]:cut_pos[1]], x_layer_params[cut_pos[1]:]))
-                    y_child = np.concatenate((y_layer_params[:cut_pos[0]], x_layer_params[cut_pos[0]:cut_pos[1]], y_layer_params[cut_pos[1]:]))
-                    
-                    # re-reshape
-                    child_1.append(x_child.reshape(x_layer_params_shape))
-                    child_2.append(y_child.reshape(y_layer_params_shape))
-
-        return (child_1, child_2)
-
-    def mutation(self, x, lower_bound=30, upper_bound=250):
-        """Simple mutation
-
-            This function will change the x
-        """
-        
-        ############# element mutation #############
-        layer_param_num = []
-        for layer_params in x:
-            layer_param_num.append(layer_params.shape)
-        # create mutation position and value
-        pos_layer = random.randint(0, len(layer_param_num) - 1)
-        mu_pos_x = random.randint(0, layer_param_num[pos_layer][0] - 1)
-        mu_pos_y = random.randint(0, layer_param_num[pos_layer][1] - 1)
-        mu_val = random.randint(lower_bound, upper_bound)
-
-        # mutation begin, this will change the x array
-        x[pos_layer][mu_pos_x][mu_pos_y] = mu_val
-
-    def record_best(self, index):
-        self.best_params = self.popu_params[index]
-
-    def save_best(self, acc, num_class, dir='log'):
-        """Save the parameters of all layers to each .npy format
-
-            Args:
-                acc: the training accuracy of the result of parameters
-                dir: the diretory to save the parameters, default='log'
-        """
-        acc *= 100
-        dir_path = os.path.join(dir, str('%.2f' % acc) + '_' + str(num_class))
-        for layer_size in self.layer_node:
-            dir_path += '_' + str(layer_size)
-            
-        if not os.path.exists(dir_path):
-            os.mkdir(dir_path)
-
-        for i, layer_params in enumerate(self.best_params):
-            np.save(os.path.join(dir_path, 'layer%d.npy' % i), layer_params)
-
-        print('save completed, save path: {}'.format(dir_path))
-    
-    def get_best(self):
-        return self.best_params
 
 ###########################################################################
 ################################# Network #################################
@@ -492,19 +201,26 @@ class Population(object):
 
 class Net_1(object):
     def __init__(self, input_size, layer1_node, output_size):
+        self.w1 = self._init_weight((input_size, layer1_node))
+        self.w2 = self._init_weight((layer1_node, output_size))
+
         self.layer1 = Linear(input_size, layer1_node)
+        self.map1 = Mapping(input_size)
         self.layer2 = Linear(layer1_node, output_size)
+        self.relu = Relu()
 
     def __call__(self, x):
         return self.forward(x)
 
+    def _init_weight(self, shape):
+        return np.random.randint(-3, 4, shape)
+
     def forward(self, x):
-        # print(x.shape)
-        # print(x[:3])
-        out = self.layer1(x)
-        # print(out[:3])
-        # sys.exit(0)
-        out = self.layer2(out)
+        out = self.layer1(x, self.w1)
+        out = self.relu(out)
+        out = self.map1(out)
+        out = self.layer2(out, self.w2)
+        # out = softmax(out)
         return out
 
     def get_parameters(self):
@@ -513,7 +229,7 @@ class Net_1(object):
             Return:
                 np.array, which shape is (layer_num, out_features, in_features)
         """
-        return [self.layer1.parameters(), self.layer2.parameters()]
+        return [self.w1, self.w2]
 
     def set_parameters(self, threshold):
         self.layer1.set_parameters(threshold[0])
@@ -546,14 +262,5 @@ class Net_2(object):
 
 
 if __name__ == '__main__':
-    # layer1 = Linear(9, 5)
-    # layer2 = Linear(5, 10)
-
-    # data = np.ones((1000, 9))
-    # out = layer1(data)
-    # layer2(out)
-
-    # a = np.array([[40, 54], [83, 120], [110, 34]])
-    # batch_norm = BatchNorm(momentum=0.01, eps=0.001, num_features=2)
-    # print(batch_norm(a))
+    print(softmax(np.array([-1,2,3])))
     pass

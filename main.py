@@ -70,13 +70,13 @@ input_test_data = test_feature.cut_into_batch(batch_size=args.batch_size, vector
 train_feature = Feature(train_set.data, kernel_size=(4,4), stride=(3,3))
 train_fv, train_label = train_feature.extract_num_class(args.class_list)
 train_fv = train_fv.reshape(-1, 100)
-rescale(train_fv, 30, 250, False)
+train_fv = rescale(train_fv, 30, 250, False)
 input_train_data = train_feature.cut_into_batch(batch_size=args.batch_size, vector=train_fv, labels=train_label, num_class=args.output_size, one_hot=True, shuffle=True)
 
 test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
 test_fv, test_label = test_feature.extract_num_class(args.class_list)
 test_fv = test_fv.reshape(-1, 100)
-rescale(test_fv, 30, 250, False)
+test_fv = rescale(test_fv, 30, 250, False)
 input_test_data = test_feature.cut_into_batch(batch_size=args.batch_size, vector=test_fv, labels=test_label, num_class=args.output_size, one_hot=True, shuffle=True)
 
 
