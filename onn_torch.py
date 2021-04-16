@@ -22,7 +22,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 input_size = 100
 layer1_node = 512
-layer2_node = 128
+layer2_node = 32
 output_size = 10
 
 batch_size = 1000
@@ -32,12 +32,14 @@ learning_rate = 0.01
 lr_end = 1e-4
 lr_decay = (lr_end / learning_rate)**(1. / epoch)
 
+clip = False
+w_round = False
+
 train = True
 load_model = False
 load_model_path = 'log_torch/10_512_lr_decay/float.pt'
 
-
-dir_path = 'log_torch/10_512_128_lr_decay'
+dir_path = 'log_torch/10_512_float'
 float_path = os.path.join(dir_path, 'float.pt')
 quant_path = os.path.join(dir_path, 'quant.pt')
 def create_dir(dir_path):
@@ -108,12 +110,13 @@ class Linear(nn.Module):
             in_features: size of each input sample
             out_features: size of each output sample
     """
-    def __init__(self, in_features, out_features, f2c_func):
+    def __init__(self, in_features, out_features, f2c_func, w_round=False):
         super(Linear, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.bias = 3
         self.f2c_func = f2c_func
+        self.w_round = w_round
 
     def __call__(self, inputs, w, is_train):
         return self.forward(inputs, w, is_train)
@@ -127,8 +130,9 @@ class Linear(nn.Module):
             Return:
                 output: shape=(batch_size, out_features), type=np.array
         """
-        # round w
-        w = winarize(w)
+        # round w, 训练的时候开会难以收敛
+        if self.w_round == True:
+            w = winarize(w)
         # change frequency to counter number
         shape = inputs.shape
         output = inputs.reshape(-1)
@@ -174,7 +178,7 @@ class F2C(nn.Module):
         return counter
 
 class Net(nn.Module):
-    def __init__(self, input_size, layer1_node, output_size):
+    def __init__(self, input_size, layer1_node, output_size, w_round):
         super(Net, self).__init__()
 
         self.is_train = None
@@ -182,8 +186,8 @@ class Net(nn.Module):
         self.w2 = torch.nn.Parameter(self._init_weight((layer1_node, output_size), requires_grad=True))
 
         self.f2c = F2C()
-        self.layer1 = Linear(input_size, layer1_node, self.f2c)
-        self.layer2 = Linear(layer1_node, output_size, self.f2c)
+        self.layer1 = Linear(input_size, layer1_node, self.f2c, w_round)
+        self.layer2 = Linear(layer1_node, output_size, self.f2c, w_round)
 
         self.mapping = Mapping(input_size)
         self.relu = nn.ReLU()
@@ -214,7 +218,7 @@ class Net(nn.Module):
 
 
 class Net_2(nn.Module):
-    def __init__(self, input_size, layer1_node, layer2_node, output_size):
+    def __init__(self, input_size, layer1_node, layer2_node, output_size, w_round):
         super(Net_2, self).__init__()
 
         self.is_train = None
@@ -223,9 +227,9 @@ class Net_2(nn.Module):
         self.w3 = torch.nn.Parameter(self._init_weight((layer2_node, output_size), requires_grad=True))
 
         self.f2c = F2C()
-        self.layer1 = Linear(input_size, layer1_node, self.f2c)
-        self.layer2 = Linear(layer1_node, layer2_node, self.f2c)
-        self.layer3 = Linear(layer2_node, output_size, self.f2c)
+        self.layer1 = Linear(input_size, layer1_node, self.f2c, w_round)
+        self.layer2 = Linear(layer1_node, layer2_node, self.f2c, w_round)
+        self.layer3 = Linear(layer2_node, output_size, self.f2c, w_round)
 
         self.mapping = Mapping(input_size)
         self.mapping2 = Mapping(layer1_node)
@@ -272,7 +276,8 @@ def adjust_learning_rate(optimizer):
         param_group['lr'] = lr
 
 criterion = nn.CrossEntropyLoss()
-net = Net_2(input_size, layer1_node, layer2_node, output_size)
+net = Net(input_size, layer1_node, output_size, w_round)
+# net = Net_2(input_size, layer1_node, layer2_node, output_size, w_round)
 net.to(device)
 
 if train == True:
@@ -310,7 +315,8 @@ if train == True:
             loss.backward()
             optimizer.step()
 
-            clip_weight(net.parameters())
+            if clip == True:
+                clip_weight(net.parameters())
 
             # print(net.w1.grad)
             # print(net.w2.grad)
@@ -352,7 +358,7 @@ if train == True:
 
 net.train_flag(False)
 net.eval()
-net.load_state_dict(torch.load(quant_path))
+net.load_state_dict(torch.load(quant_path, map_location=torch.device(device)))
 state_dict = net.state_dict()
 # print(state_dict)
 # print(state_dict['w1'].min(), state_dict['w1'].max())
