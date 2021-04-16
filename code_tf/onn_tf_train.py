@@ -22,6 +22,9 @@ batch_size = 1000
 epoch = 1000
 
 learning_rate = 0.01
+decay_rate = 0.96
+decay_step = 100
+
 checkpoint_path = 'log_tf/10_512_init_dev3/no_limit'
 
 ############### data pre-processing ###############
@@ -66,7 +69,11 @@ def mapping(inputs, in_size):
 x = tf.placeholder(tf.float32, (None, input_size))
 y = tf.placeholder(tf.int32, (None, output_size))
 dropout_rate = tf.placeholder(tf.float32)  # dropout rate
-# global_step = tf.Variable(tf.constant(0))
+
+# 学习率衰减
+global_step = tf.Variable(tf.constant(0))
+lr_current = tf.train.exponential_decay(learning_rate, global_step, decay_step, decay_rate, staircase=False)
+
 
 # Net
 l1 = Linear(x, input_size, layer1_node, activation_func=tf.nn.relu)
@@ -82,7 +89,7 @@ prediction = Linear(l1_dropout, layer1_node, output_size)
 #                                                         symmetric=True)
 
 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=prediction))
-train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+train_step = tf.train.AdamOptimizer(lr_current).minimize(loss)
 
 
 saver = tf.train.Saver()

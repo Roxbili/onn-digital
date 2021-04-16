@@ -20,7 +20,7 @@ output_size = 10
 
 batch_size = 1000
 
-checkpoint_dir = 'log_tf/10_512/'
+checkpoint_dir = 'log_tf/10_512_init_dev3/'
 
 ############### quantization ###############
 
@@ -32,6 +32,7 @@ checkpoint_dir = 'log_tf/10_512/'
 #         #除了修改参数名称，还可以修改参数值（var）
 #         print(var)
 #         var = var.round()
+#         print(var)
 
 #         renamed_var = tf.Variable(var, name=var_name) #使用加入前缀的新名称重新构造了参数
 #         new_var_list.append(renamed_var) #把赋予新名称的参数加入空列表
