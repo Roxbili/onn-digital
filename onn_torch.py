@@ -21,20 +21,28 @@ from torch.autograd import Function
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 input_size = 100
-layer1_node = 128
-# layer2_node = 50
+layer1_node = 512
+layer2_node = 128
 output_size = 10
 
 batch_size = 1000
-epoch = 100
+epoch = 1000
+
 learning_rate = 0.01
+lr_end = 1e-4
+lr_decay = (lr_end / learning_rate)**(1. / epoch)
 
 train = True
-load_model = True
-load_model_path = 'log_torch/10_128/float.pt'
+load_model = False
+load_model_path = 'log_torch/10_512_lr_decay/float.pt'
 
-float_path = 'log_torch/10_128_0.01/float.pt'
-quant_path = 'log_torch/10_128_0.01/quant.pt'
+
+dir_path = 'log_torch/10_512_128_lr_decay'
+float_path = os.path.join(dir_path, 'float.pt')
+quant_path = os.path.join(dir_path, 'quant.pt')
+def create_dir(dir_path):
+    if os.path.exists(dir_path) == False:
+        os.mkdir(dir_path)
 
 ############### data pre-processing ###############
 
@@ -93,7 +101,7 @@ class WinarizeF(Function):
 # aliases
 winarize = WinarizeF.apply
 
-class Linear(object):
+class Linear(nn.Module):
     """Linear layer
 
         Args:
@@ -101,6 +109,7 @@ class Linear(object):
             out_features: size of each output sample
     """
     def __init__(self, in_features, out_features, f2c_func):
+        super(Linear, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.bias = 3
@@ -131,8 +140,9 @@ class Linear(object):
         output += self.bias
         return output
 
-class Mapping(object):
+class Mapping(nn.Module):
     def __init__(self, input_node):
+        super(Mapping, self).__init__()
         self.input_node = input_node
 
     def __call__(self, inputs, is_train):
@@ -146,9 +156,9 @@ class Mapping(object):
         output = (output + 5) * 10  # return (50, 200)
         return output
 
-class F2C(object):
+class F2C(nn.Module):
     def __init__(self):
-        pass
+        super(F2C, self).__init__()
     
     def __call__(self, frequency, is_train):
         return self.forward(frequency, is_train)
@@ -203,16 +213,50 @@ class Net(nn.Module):
         self.is_train = flag
 
 
-class Optim(object):
-    """Optimization operator, to updata parameters in model"""
-    def __init__(self, net):
-        self.net = net
-    
-    def step(self):
-        pass
+class Net_2(nn.Module):
+    def __init__(self, input_size, layer1_node, layer2_node, output_size):
+        super(Net_2, self).__init__()
 
-    def zero_grad(self):
-        self.net.zero_grad()
+        self.is_train = None
+        self.w1 = torch.nn.Parameter(self._init_weight((input_size, layer1_node), requires_grad=True))
+        self.w2 = torch.nn.Parameter(self._init_weight((layer1_node, layer2_node), requires_grad=True))
+        self.w3 = torch.nn.Parameter(self._init_weight((layer2_node, output_size), requires_grad=True))
+
+        self.f2c = F2C()
+        self.layer1 = Linear(input_size, layer1_node, self.f2c)
+        self.layer2 = Linear(layer1_node, layer2_node, self.f2c)
+        self.layer3 = Linear(layer2_node, output_size, self.f2c)
+
+        self.mapping = Mapping(input_size)
+        self.mapping2 = Mapping(layer1_node)
+        self.relu = nn.ReLU()
+        self.softmax = nn.Softmax(dim=1)
+        self.dropout = nn.Dropout(0.2)
+
+    def __call__(self, x):
+        return self.forward(x)
+
+    def _init_weight(self, shape, requires_grad):
+        # w = torch.randint(-3, 4, shape).float()
+        w = torch.empty(shape)
+        w = torch.nn.init.uniform_(w, a=-3., b=3.)
+        w.requires_grad=requires_grad
+        return w
+
+    def forward(self, x):
+        out = self.layer1(x, self.w1, self.is_train)
+        out = self.relu(out)
+        out = self.mapping(out, self.is_train)
+        out = self.layer2(out, self.w2, self.is_train)
+        out = self.relu(out)
+        out = self.mapping2(out, self.is_train)
+        out = self.dropout(out)
+        out = self.layer3(out, self.w3, self.is_train)
+        out = self.softmax(out)
+        return out
+
+    def train_flag(self, flag):
+        self.is_train = flag
 
 
 def clip_weight(parameters):
@@ -220,9 +264,15 @@ def clip_weight(parameters):
         p = p.data
         p.clamp_(-3., 3.)
 
+# learning rate schedule
+def adjust_learning_rate(optimizer):
+    for param_group in optimizer.param_groups:
+        lr = param_group['lr']
+        lr = lr * lr_decay
+        param_group['lr'] = lr
 
 criterion = nn.CrossEntropyLoss()
-net = Net(input_size, layer1_node, output_size)
+net = Net_2(input_size, layer1_node, layer2_node, output_size)
 net.to(device)
 
 if train == True:
@@ -271,6 +321,9 @@ if train == True:
             
             # sys.exit(0)
 
+        adjust_learning_rate(optimizer)
+
+    create_dir(dir_path)
     torch.save(net.state_dict(), float_path)
 
     ###################### quantization ######################
