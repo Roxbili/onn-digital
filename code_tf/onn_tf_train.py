@@ -15,7 +15,7 @@ import tensorflow as tf
 ############### network parameters ###############
 input_size = 100
 layer1_node = 512
-# layer2_node = 128
+# layer2_node = 256
 output_size = 10
 
 batch_size = 1000
@@ -72,7 +72,7 @@ def floor(inputs):
         outputs = tf.floor(inputs)
     return outputs
 
-def Linear(inputs, in_size, out_size, activation_func=None):
+def Linear(inputs, in_size, out_size):
     # Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=1))
     Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=3), name='weight')
     clamp_weights = clamp(Weights, -3., 3.)
@@ -82,9 +82,6 @@ def Linear(inputs, in_size, out_size, activation_func=None):
 
     outputs = floor(inputs / 10) - 1
     outputs = tf.matmul(outputs, w) + 3
-
-    if activation_func != None:
-        outputs = activation_func(outputs)
 
     return outputs, clamp_weights
 
@@ -108,13 +105,14 @@ lr_current = tf.train.exponential_decay(learning_rate, global_step, decay_step, 
 
 ############################### Network ###############################
 
-l1, weight1 = Linear(x, input_size, layer1_node, activation_func=tf.nn.relu)
+l1, weight1 = Linear(x, input_size, layer1_node)
 l1_mapping = mapping(l1, input_size)
 if batch_norm == True:
     l1_batchnorm = tf.layers.batch_normalization(l1_mapping, training=is_train)
-    l1_dropout = tf.nn.dropout(l1_batchnorm, rate=dropout_rate)
+    l1_relu = tf.nn.relu(l1_batchnorm)
 else:
-    l1_dropout = tf.nn.dropout(l1_mapping, rate=dropout_rate)
+    l1_relu = tf.nn.relu(l1_mapping)
+l1_dropout = tf.nn.dropout(l1_relu, rate=dropout_rate)
 
 prediction, weight2 = Linear(l1_dropout, layer1_node, output_size)
 

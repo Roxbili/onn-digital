@@ -20,9 +20,9 @@ output_size = 10
 
 batch_size = 1000
 
-checkpoint_dir = 'log_tf/10_512_round_clamp_(1000epoch)/'
-checkpoint_quant_path = 'log_tf/10_512_round_clamp_quant_(1000epoch)/quant'
-quant = False
+checkpoint_dir = 'log_tf/10_512_round_clamp_floor_batchnorm/'
+checkpoint_quant_path = 'log_tf/10_512_round_clamp_floor_quant_final/quant'
+quant = False 
 
 ############### quantization ###############
 
@@ -49,6 +49,7 @@ if quant == True:
         sess.run(tf.global_variables_initializer()) #初始化一下参数（这一步必做）
         saver.save(sess, checkpoint_quant_path) #直接进行保存
         print("done !")
+    sys.exit(0)
 
 ############### data pre-processing ###############
 
@@ -72,19 +73,20 @@ input_test_data = test_feature.cut_into_batch(batch_size=batch_size, vector=test
 
 sess = tf.Session()
 
-def Linear(inputs, in_size, out_size, activation_func=None):
-    Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=1), name='weight')
+def Linear(inputs, in_size, out_size):
+    # Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=1))
+    Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=3), name='weight')
+    clamp_weights = tf.clip_by_value(Weights, -3., 3.)
 
-    outputs = inputs // 10 - 1
+    w = tf.round(clamp_weights)
+
+    outputs = tf.floor(inputs / 10) - 1
     outputs = tf.matmul(outputs, Weights) + 3
 
-    if activation_func != None:
-        outputs = activation_func(outputs)
-
-    return outputs
+    return outputs, clamp_weights
 
 def mapping(inputs, in_size):
-    outputs = inputs // (4 * in_size)
+    outputs = tf.floor(inputs / (4 * in_size))
     outputs = (outputs + 5) * 10
     return outputs
 
@@ -93,11 +95,12 @@ y = tf.placeholder(tf.int32, (None, output_size))
 dropout_rate = tf.placeholder(tf.float32)  # dropout rate
 
 # Net
-l1 = Linear(x, input_size, layer1_node, activation_func=tf.nn.relu)
+l1, weight1 = Linear(x, input_size, layer1_node)
 l1_mapping = mapping(l1, input_size)
-l1_dropout = tf.nn.dropout(l1_mapping, rate=dropout_rate)
+l1_relu = tf.nn.relu(l1_mapping)
+l1_dropout = tf.nn.dropout(l1_relu, rate=dropout_rate)
 
-prediction = Linear(l1_dropout, layer1_node, output_size)
+prediction, weight2 = Linear(l1_dropout, layer1_node, output_size)
 
 saver = tf.train.Saver()
 saver.restore(sess, tf.train.latest_checkpoint(os.path.split(checkpoint_quant_path)[0]))
@@ -108,6 +111,9 @@ correct_prediction = tf.equal(tf.argmax(prediction, 1), tf.argmax(y, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, 'float'))
     
 total_accuracy = 0.
+
+w1, w2 = sess.run([weight1, weight2])
+print(w1, w2)
 for i, (images, labels) in enumerate(input_test_data): 
     acc_ = sess.run(accuracy, feed_dict={x: images, y: labels, dropout_rate: 0})
     total_accuracy += acc_ * batch_size / len(test_fv)
