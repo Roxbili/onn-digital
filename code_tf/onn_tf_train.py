@@ -25,7 +25,7 @@ learning_rate = 0.01
 decay_rate = 0.96
 decay_step = 100
 
-checkpoint_path = 'log_tf/10_512_round_clamp_floor/limit'
+checkpoint_path = 'log_tf/10_512_round_clamp_floor_batchnorm/limit'
 
 ############### data pre-processing ###############
 
@@ -99,6 +99,8 @@ def mapping(inputs, in_size):
 x = tf.placeholder(tf.float32, (None, input_size))
 y = tf.placeholder(tf.int32, (None, output_size))
 dropout_rate = tf.placeholder(tf.float32)  # dropout rate
+is_train = tf.placeholder(tf.bool)
+batch_norm = tf.placeholder(tf.bool)
 
 # 学习率衰减
 global_step = tf.Variable(tf.constant(0))
@@ -108,7 +110,11 @@ lr_current = tf.train.exponential_decay(learning_rate, global_step, decay_step, 
 
 l1, weight1 = Linear(x, input_size, layer1_node, activation_func=tf.nn.relu)
 l1_mapping = mapping(l1, input_size)
-l1_dropout = tf.nn.dropout(l1_mapping, rate=dropout_rate)
+if batch_norm == True:
+    l1_batchnorm = tf.layers.batch_normalization(l1_mapping, training=is_train)
+    l1_dropout = tf.nn.dropout(l1_batchnorm, rate=dropout_rate)
+else:
+    l1_dropout = tf.nn.dropout(l1_mapping, rate=dropout_rate)
 
 prediction, weight2 = Linear(l1_dropout, layer1_node, output_size)
 
@@ -119,7 +125,13 @@ prediction, weight2 = Linear(l1_dropout, layer1_node, output_size)
 #                                                         symmetric=True)
 
 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=prediction))
-train_step = tf.train.AdamOptimizer(lr_current).minimize(loss)
+if batch_norm == True:
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        train_step = tf.train.AdamOptimizer(lr_current).minimize(loss)
+else:
+    train_step = tf.train.AdamOptimizer(lr_current).minimize(loss)
+    
 
 # gradient
 clamp1_grad = tf.gradients(loss, weight1)
@@ -137,16 +149,16 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, 'float'))
 
 for _ in range(epoch):
     for i, (images, labels) in enumerate(input_train_data):
-        sess.run(train_step, feed_dict={x: images, y: labels, dropout_rate: 0.2, global_step: i})
+        sess.run(train_step, feed_dict={x: images, y: labels, dropout_rate: 0.2, global_step: i, is_train: True, batch_norm: False})
         if i % 10 == 0:
-            acc_, loss_ = sess.run([accuracy, loss], feed_dict={x: images, y: labels, dropout_rate: 0.2})
+            acc_, loss_ = sess.run([accuracy, loss], feed_dict={x: images, y: labels, dropout_rate: 0.2, is_train: True, batch_norm: False})
             print('Epoch %d, accuracy: %.5f, loss: %.6f' % (_, acc_, loss_))
 
             # print(sess.run([clamp1_grad, clamp2_grad], feed_dict={x: images, y: labels, dropout_rate: 0.2}))
     
     total_accuracy = 0.
     for i, (images, labels) in enumerate(input_test_data): 
-        acc_ = sess.run(accuracy, feed_dict={x: images, y: labels, dropout_rate: 0})
+        acc_ = sess.run(accuracy, feed_dict={x: images, y: labels, dropout_rate: 0, is_train: False, batch_norm: False})
         total_accuracy += acc_ * batch_size / len(test_fv)
     print('Accuracy of the network on the 10000 test images: %.4f' % total_accuracy)
 
