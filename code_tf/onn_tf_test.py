@@ -20,24 +20,35 @@ output_size = 10
 
 batch_size = 1000
 
-checkpoint_dir = 'log_tf/10_512_init_dev3/'
+checkpoint_dir = 'log_tf/10_512_round_clamp_(1000epoch)/'
+checkpoint_quant_path = 'log_tf/10_512_round_clamp_quant_(1000epoch)/quant'
+quant = False
 
 ############### quantization ###############
 
-# with tf.Session() as sess:
-#     new_var_list=[] #新建一个空列表存储更新后的Variable变量
-#     for var_name, _ in tf.contrib.framework.list_variables(checkpoint_dir): #得到checkpoint文件中所有的参数（名字，形状）元组
-#         var = tf.contrib.framework.load_variable(checkpoint_dir, var_name) #得到上述参数的值
+if quant == True:
+    with tf.Session() as sess:
+        new_var_list=[] #新建一个空列表存储更新后的Variable变量
+        for var_name, _ in tf.contrib.framework.list_variables(checkpoint_dir): #得到checkpoint文件中所有的参数（名字，形状）元组
+            var = tf.contrib.framework.load_variable(checkpoint_dir, var_name) #得到上述参数的值
 
-#         #除了修改参数名称，还可以修改参数值（var）
-#         print(var)
-#         var = var.round()
-#         print(var)
+            #除了修改参数名称，还可以修改参数值（var）
+            # print(var)
+            if var_name == 'weight' or var_name == 'weight_1':
+                print('quant', var_name)
+                var = tf.clip_by_value(var, -3., 3.)
+                var = tf.round(var)
+                # print(var)
+            # print(var_name, var.max(), var.min())
 
-#         renamed_var = tf.Variable(var, name=var_name) #使用加入前缀的新名称重新构造了参数
-#         new_var_list.append(renamed_var) #把赋予新名称的参数加入空列表
-
-# sys.exit(0)
+            renamed_var = tf.Variable(var, name=var_name) #使用加入前缀的新名称重新构造了参数
+            new_var_list.append(renamed_var) #把赋予新名称的参数加入空列表
+        
+        print('starting to write new checkpoint !')
+        saver = tf.train.Saver(var_list=new_var_list) #构造一个保存器
+        sess.run(tf.global_variables_initializer()) #初始化一下参数（这一步必做）
+        saver.save(sess, checkpoint_quant_path) #直接进行保存
+        print("done !")
 
 ############### data pre-processing ###############
 
@@ -62,7 +73,7 @@ input_test_data = test_feature.cut_into_batch(batch_size=batch_size, vector=test
 sess = tf.Session()
 
 def Linear(inputs, in_size, out_size, activation_func=None):
-    Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=1))
+    Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=1), name='weight')
 
     outputs = inputs // 10 - 1
     outputs = tf.matmul(outputs, Weights) + 3
@@ -88,9 +99,8 @@ l1_dropout = tf.nn.dropout(l1_mapping, rate=dropout_rate)
 
 prediction = Linear(l1_dropout, layer1_node, output_size)
 
-
 saver = tf.train.Saver()
-saver.restore(sess, tf.train.latest_checkpoint(checkpoint_dir))
+saver.restore(sess, tf.train.latest_checkpoint(os.path.split(checkpoint_quant_path)[0]))
 
 # sess.run(tf.global_variables_initializer())
 

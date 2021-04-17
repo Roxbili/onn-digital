@@ -25,7 +25,7 @@ learning_rate = 0.01
 decay_rate = 0.96
 decay_step = 100
 
-checkpoint_path = 'log_tf/10_512_init_dev3/no_limit'
+checkpoint_path = 'log_tf/10_512_round_clamp_floor/limit'
 
 ############### data pre-processing ###############
 
@@ -45,26 +45,56 @@ test_fv = test_fv.reshape(-1, 100)
 test_fv = rescale(test_fv, 50, 200, True)
 input_test_data = test_feature.cut_into_batch(batch_size=batch_size, vector=test_fv, labels=test_label, num_class=output_size, one_hot=True)
 
-############### Net ###############
+############### 网络组件 ###############
 
 sess = tf.Session()
 
+#使用修饰器，建立梯度反向传播函数。其中op.input包含输入值、输出值，grad包含上层传来的梯度
+@tf.RegisterGradient("CopyGrad")
+def round_grad(op, grad):
+    new_grad = tf.identity(grad)
+    return new_grad
+ 
+#使用with上下文管理器覆盖原始的sign梯度函数
+def roundW(inputs):
+    with tf.get_default_graph().gradient_override_map({"Round":'CopyGrad'}):
+        outputs = tf.round(inputs)
+    return outputs
+
+def clamp(inputs, value_min, value_max):
+    '''被截断的部分可以考虑梯度设置成0'''
+    with tf.get_default_graph().gradient_override_map({"ClipByValue":'CopyGrad'}):
+        outputs = tf.clip_by_value(inputs, -3., 3.)
+    return outputs
+
+def floor(inputs):
+    with tf.get_default_graph().gradient_override_map({"Floor":'CopyGrad'}):
+        outputs = tf.floor(inputs)
+    return outputs
+
 def Linear(inputs, in_size, out_size, activation_func=None):
     # Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=1))
-    Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=3))
+    Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=3), name='weight')
+    clamp_weights = clamp(Weights, -3., 3.)
+    # Weights = tf.assign(Weights, clamp_value)
 
-    outputs = inputs / 10 - 1
-    outputs = tf.matmul(outputs, Weights) + 3
+    w = roundW(clamp_weights)
+
+    outputs = floor(inputs / 10) - 1
+    outputs = tf.matmul(outputs, w) + 3
 
     if activation_func != None:
         outputs = activation_func(outputs)
 
-    return outputs
+    return outputs, clamp_weights
 
 def mapping(inputs, in_size):
-    outputs = inputs / (4 * in_size)
+    outputs = floor(inputs / (4 * in_size))
     outputs = (outputs + 5) * 10
     return outputs
+
+
+############################### 占位符等基本参数设置 ###############################
 
 x = tf.placeholder(tf.float32, (None, input_size))
 y = tf.placeholder(tf.int32, (None, output_size))
@@ -74,13 +104,13 @@ dropout_rate = tf.placeholder(tf.float32)  # dropout rate
 global_step = tf.Variable(tf.constant(0))
 lr_current = tf.train.exponential_decay(learning_rate, global_step, decay_step, decay_rate, staircase=False)
 
+############################### Network ###############################
 
-# Net
-l1 = Linear(x, input_size, layer1_node, activation_func=tf.nn.relu)
+l1, weight1 = Linear(x, input_size, layer1_node, activation_func=tf.nn.relu)
 l1_mapping = mapping(l1, input_size)
 l1_dropout = tf.nn.dropout(l1_mapping, rate=dropout_rate)
 
-prediction = Linear(l1_dropout, layer1_node, output_size)
+prediction, weight2 = Linear(l1_dropout, layer1_node, output_size)
 
 # tf.contrib.quantize.experimental_create_training_graph(sess.graph,
 #                                                         weight_bits=3,
@@ -91,6 +121,12 @@ prediction = Linear(l1_dropout, layer1_node, output_size)
 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=prediction))
 train_step = tf.train.AdamOptimizer(lr_current).minimize(loss)
 
+# gradient
+clamp1_grad = tf.gradients(loss, weight1)
+clamp2_grad = tf.gradients(loss, weight2)
+
+
+############################### run ###############################
 
 saver = tf.train.Saver()
 
@@ -101,10 +137,12 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, 'float'))
 
 for _ in range(epoch):
     for i, (images, labels) in enumerate(input_train_data):
-        sess.run(train_step, feed_dict={x: images, y: labels, dropout_rate: 0.2})
+        sess.run(train_step, feed_dict={x: images, y: labels, dropout_rate: 0.2, global_step: i})
         if i % 10 == 0:
             acc_, loss_ = sess.run([accuracy, loss], feed_dict={x: images, y: labels, dropout_rate: 0.2})
             print('Epoch %d, accuracy: %.5f, loss: %.6f' % (_, acc_, loss_))
+
+            # print(sess.run([clamp1_grad, clamp2_grad], feed_dict={x: images, y: labels, dropout_rate: 0.2}))
     
     total_accuracy = 0.
     for i, (images, labels) in enumerate(input_test_data): 
