@@ -15,7 +15,7 @@ import tensorflow as tf
 ############### network parameters ###############
 input_size = 100
 layer1_node = 512
-# layer2_node = 256
+# layer2_node = 128
 output_size = 10
 
 batch_size = 1000
@@ -25,7 +25,7 @@ learning_rate = 0.01
 decay_rate = 0.96
 decay_step = 100
 
-checkpoint_path = 'log_tf/10_512_round_clamp_floor_batchnorm/limit'
+checkpoint_path = 'log_tf/10_128_round_clamp_floor_relu/limit'
 
 ############### data pre-processing ###############
 
@@ -56,7 +56,7 @@ def round_grad(op, grad):
     return new_grad
  
 #使用with上下文管理器覆盖原始的sign梯度函数
-def roundW(inputs):
+def round_(inputs):
     with tf.get_default_graph().gradient_override_map({"Round":'CopyGrad'}):
         outputs = tf.round(inputs)
     return outputs
@@ -72,16 +72,22 @@ def floor(inputs):
         outputs = tf.floor(inputs)
     return outputs
 
-def Linear(inputs, in_size, out_size):
+def Linear(inputs, in_size, out_size, activation_func=None):
     # Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=1))
     Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=3), name='weight')
-    clamp_weights = clamp(Weights, -3., 3.)
-    # Weights = tf.assign(Weights, clamp_value)
+    # Bias = tf.Variable(tf.zeros([out_size]))
 
-    w = roundW(clamp_weights)
+    clamp_weights = clamp(Weights, -3., 3.)
+    # clamp_bias = clamp(Bias, -3., 3.)
+
+    w = round_(clamp_weights)
+    # b = round_(clamp_bias)
 
     outputs = floor(inputs / 10) - 1
     outputs = tf.matmul(outputs, w) + 3
+
+    if activation_func != None:
+        outputs = activation_func(outputs)
 
     return outputs, clamp_weights
 
@@ -105,7 +111,7 @@ lr_current = tf.train.exponential_decay(learning_rate, global_step, decay_step, 
 
 ############################### Network ###############################
 
-l1, weight1 = Linear(x, input_size, layer1_node)
+l1, weight1 = Linear(x, input_size, layer1_node, activation_func=None)
 l1_mapping = mapping(l1, input_size)
 if batch_norm == True:
     l1_batchnorm = tf.layers.batch_normalization(l1_mapping, training=is_train)
