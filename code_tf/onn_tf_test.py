@@ -80,27 +80,27 @@ def Linear(inputs, in_size, out_size):
 
     w = tf.round(clamp_weights)
 
-    outputs = tf.floor(inputs / 10) - 1
-    outputs = tf.matmul(outputs, Weights) + 3
+    counters = tf.floor(inputs / 10) - 1
+    outputs = tf.matmul(counters, Weights) + 3
 
-    return outputs, clamp_weights
+    return outputs, clamp_weights, counters
 
 def mapping(inputs, in_size):
-    outputs = tf.floor(inputs / (4 * in_size))
-    outputs = (outputs + 5) * 10
-    return outputs
+    countersWdiv4n = tf.floor(inputs / (4 * in_size))
+    outputs = (countersWdiv4n + 5) * 10
+    return outputs, countersWdiv4n
 
 x = tf.placeholder(tf.float32, (None, input_size))
 y = tf.placeholder(tf.int32, (None, output_size))
 dropout_rate = tf.placeholder(tf.float32)  # dropout rate
 
 # Net
-l1, weight1 = Linear(x, input_size, layer1_node)
-l1_mapping = mapping(l1, input_size)
+l1, weight1, l1_counters = Linear(x, input_size, layer1_node)
+l1_mapping, l1_countersWdiv4n = mapping(l1, input_size)
 l1_relu = tf.nn.relu(l1_mapping)
 l1_dropout = tf.nn.dropout(l1_relu, rate=dropout_rate)
 
-prediction, weight2 = Linear(l1_dropout, layer1_node, output_size)
+prediction, weight2, l2_counters = Linear(l1_dropout, layer1_node, output_size)
 
 saver = tf.train.Saver()
 saver.restore(sess, tf.train.latest_checkpoint(os.path.split(checkpoint_quant_path)[0]))
@@ -110,11 +110,40 @@ saver.restore(sess, tf.train.latest_checkpoint(os.path.split(checkpoint_quant_pa
 correct_prediction = tf.equal(tf.argmax(prediction, 1), tf.argmax(y, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, 'float'))
     
-total_accuracy = 0.
 
+
+############################# run #############################
+
+npy_path = 'log_tf/npy'
 w1, w2 = sess.run([weight1, weight2])
-print(w1, w2)
+np.save(os.path.join(npy_path, 'w1.npy'), w1)
+np.save(os.path.join(npy_path, 'w2.npy'), w2)
+
+frequency = []
+counters1 = []
+counters2 = []
+countersWdiv4n = []
+
+total_accuracy = 0.
 for i, (images, labels) in enumerate(input_test_data): 
     acc_ = sess.run(accuracy, feed_dict={x: images, y: labels, dropout_rate: 0})
     total_accuracy += acc_ * batch_size / len(test_fv)
+
+    f, c1, c2, cwdiv4n = sess.run([l1_mapping, l1_counters, l2_counters, l1_countersWdiv4n], feed_dict={x: images, y: labels, dropout_rate: 0})
+    frequency.append(f)
+    counters1.append(c1)
+    counters2.append(c2)
+    countersWdiv4n.append(cwdiv4n)
+
 print('Accuracy of the network on the 10000 test images: %.4f' % total_accuracy)
+
+
+def toArraySave(lst, path):
+    tmp = np.array(lst)
+    np.save(path, tmp)
+    print('save %s successfully' % path)
+
+toArraySave(frequency, 'log_tf/npy/frequency.npy')
+toArraySave(counters1, 'log_tf/npy/counters1.npy')
+toArraySave(counters2, 'log_tf/npy/counters2.npy')
+toArraySave(countersWdiv4n, 'log_tf/npy/countersWdiv4n.npy')
