@@ -25,7 +25,7 @@ learning_rate = 0.01
 decay_rate = 0.96
 decay_step = 100
 
-checkpoint_path = 'log_tf/10_128_round_clamp_floor_relu/limit'
+checkpoint_path = 'log_tf/10_512_round_clamp_floor_relu/limit'
 
 ############### data pre-processing ###############
 
@@ -119,6 +119,11 @@ if batch_norm == True:
 else:
     l1_relu = tf.nn.relu(l1_mapping)
 l1_dropout = tf.nn.dropout(l1_relu, rate=dropout_rate)
+
+# l2, weight2 = Linear(l1_relu, layer1_node, layer2_node)
+# l2_mapping = mapping(l2, layer1_node)
+# l2_relu = tf.nn.relu(l2_mapping)
+# l2_dropout = tf.nn.dropout(l2_relu, rate=dropout_rate)
 
 prediction, weight2 = Linear(l1_dropout, layer1_node, output_size)
 

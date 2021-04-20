@@ -81,6 +81,7 @@ def Linear(inputs, in_size, out_size):
     w = tf.round(clamp_weights)
 
     counters = tf.floor(inputs / 10) - 1
+    # counters = tf.nn.relu(counters)
     outputs = tf.matmul(counters, Weights) + 3
 
     return outputs, clamp_weights, counters
@@ -138,12 +139,12 @@ for i, (images, labels) in enumerate(input_test_data):
 print('Accuracy of the network on the 10000 test images: %.4f' % total_accuracy)
 
 
-def toArraySave(lst, path):
-    tmp = np.array(lst)
-    np.save(path, tmp)
-    print('save %s successfully' % path)
+# def toArraySave(lst, path):
+#     tmp = np.array(lst)
+#     np.save(path, tmp)
+#     print('save %s successfully' % path)
 
-toArraySave(frequency, 'log_tf/npy/frequency.npy')
-toArraySave(counters1, 'log_tf/npy/counters1.npy')
-toArraySave(counters2, 'log_tf/npy/counters2.npy')
-toArraySave(countersWdiv4n, 'log_tf/npy/countersWdiv4n.npy')
+# toArraySave(frequency, 'log_tf/npy/frequency.npy')
+# toArraySave(counters1, 'log_tf/npy/counters1.npy')
+# toArraySave(counters2, 'log_tf/npy/counters2.npy')
+# toArraySave(countersWdiv4n, 'log_tf/npy/countersWdiv4n.npy')
