@@ -15,7 +15,7 @@ import tensorflow as tf
 ############### network parameters ###############
 input_size = 100
 layer1_node = 512
-# layer2_node = 128
+# layer2_node = 32
 output_size = 10
 
 batch_size = 1000
@@ -23,7 +23,7 @@ epoch = 1000
 
 learning_rate = 0.01
 decay_rate = 0.96
-decay_step = 100
+decay_step = 1000
 
 checkpoint_path = 'log_tf/10_512_round_clamp_floor_relu/limit'
 
@@ -64,7 +64,7 @@ def round_(inputs):
 def clamp(inputs, value_min, value_max):
     '''被截断的部分可以考虑梯度设置成0'''
     with tf.get_default_graph().gradient_override_map({"ClipByValue":'CopyGrad'}):
-        outputs = tf.clip_by_value(inputs, -3., 3.)
+        outputs = tf.clip_by_value(inputs, value_min, value_max)
     return outputs
 
 def floor(inputs):
@@ -83,8 +83,8 @@ def Linear(inputs, in_size, out_size, activation_func=None):
     w = round_(clamp_weights)
     # b = round_(clamp_bias)
 
-    outputs = floor(inputs / 10) - 1
-    outputs = tf.matmul(outputs, w) + 3
+    counters = floor(inputs / 10) - 1
+    outputs = tf.matmul(counters, w) + 3
 
     if activation_func != None:
         outputs = activation_func(outputs)
@@ -92,9 +92,29 @@ def Linear(inputs, in_size, out_size, activation_func=None):
     return outputs, clamp_weights
 
 def mapping(inputs, in_size):
-    outputs = floor(inputs / (4 * in_size))
-    outputs = (outputs + 5) * 10
+    countersWdiv4n = floor(inputs / (4 * in_size))
+    outputs = (countersWdiv4n + 5) * 10
     return outputs
+
+def BatchNorm(inputs, is_train=False):
+    # batch norm参数
+    gamma = tf.Variable(tf.ones([num_units]), name='gamma')
+    beta = tf.Variable(tf.zeros([num_units]), name='beta')
+    pop_mean = tf.Variable(tf.zeros([num_units]), trainable=False, name='mean')
+    pop_variance = tf.Variable(tf.ones([num_units]), trainable=False, name='variance')
+    epsilon=1e-3
+
+    if is_train == True:
+        batch_mean, batch_variance = tf.nn.moments(inputs, [0])
+
+        decay = 0.99
+        train_mean = tf.assign(pop_mean, pop_mean * decay + batch_mean * (1 - decay))
+        train_variance = tf.assign(pop_variance, pop_variance * decay + batch_variance * (1 - decay))
+
+        with tf.control_dependencies([train_mean, train_variance]):
+            return tf.nn.batch_normalization(inputs, batch_mean, batch_variance, beta, gamma, epsilon)
+    else:
+        return tf.nn.batch_normalization(layer, pop_mean, pop_variance, beta, gamma, epsilon)
 
 
 ############################### 占位符等基本参数设置 ###############################
@@ -115,6 +135,7 @@ l1, weight1 = Linear(x, input_size, layer1_node, activation_func=None)
 l1_mapping = mapping(l1, input_size)
 if batch_norm == True:
     l1_batchnorm = tf.layers.batch_normalization(l1_mapping, training=is_train)
+    # l1_batchnorm = BatchNorm(l1_mapping, is_train=is_train)
     l1_relu = tf.nn.relu(l1_batchnorm)
 else:
     l1_relu = tf.nn.relu(l1_mapping)
@@ -122,10 +143,16 @@ l1_dropout = tf.nn.dropout(l1_relu, rate=dropout_rate)
 
 # l2, weight2 = Linear(l1_relu, layer1_node, layer2_node)
 # l2_mapping = mapping(l2, layer1_node)
-# l2_relu = tf.nn.relu(l2_mapping)
+# if batch_norm == True:
+#     l2_batchnorm = tf.layers.batch_normalization(l2_mapping, training=is_train)
+#     # l2_batchnorm = BatchNorm(l2_mapping, is_train=is_train)
+#     l2_relu = tf.nn.relu(l2_batchnorm)
+# else:
+#     l2_relu = tf.nn.relu(l2_mapping)
 # l2_dropout = tf.nn.dropout(l2_relu, rate=dropout_rate)
 
 prediction, weight2 = Linear(l1_dropout, layer1_node, output_size)
+# prediction, weight2 = Linear(l2_relu, layer2_node, output_size)
 
 # tf.contrib.quantize.experimental_create_training_graph(sess.graph,
 #                                                         weight_bits=3,

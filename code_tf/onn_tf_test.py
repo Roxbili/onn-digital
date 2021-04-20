@@ -20,8 +20,8 @@ output_size = 10
 
 batch_size = 1000
 
-checkpoint_dir = 'log_tf/10_512_round_clamp_floor_batchnorm/'
-checkpoint_quant_path = 'log_tf/10_512_round_clamp_floor_quant_final/quant'
+checkpoint_dir = 'log_tf/10_512_round_clamp_floor_relu_01/'
+checkpoint_quant_path = 'log_tf/10_512_round_clamp_floor_final/quant'
 quant = False 
 
 ############### quantization ###############
@@ -82,9 +82,9 @@ def Linear(inputs, in_size, out_size):
 
     counters = tf.floor(inputs / 10) - 1
     # counters = tf.nn.relu(counters)
-    outputs = tf.matmul(counters, Weights) + 3
+    outputs = tf.matmul(counters, w) + 3
 
-    return outputs, clamp_weights, counters
+    return outputs, w, counters
 
 def mapping(inputs, in_size):
     countersWdiv4n = tf.floor(inputs / (4 * in_size))
@@ -144,7 +144,7 @@ print('Accuracy of the network on the 10000 test images: %.4f' % total_accuracy)
 #     np.save(path, tmp)
 #     print('save %s successfully' % path)
 
-# toArraySave(frequency, 'log_tf/npy/frequency.npy')
-# toArraySave(counters1, 'log_tf/npy/counters1.npy')
-# toArraySave(counters2, 'log_tf/npy/counters2.npy')
-# toArraySave(countersWdiv4n, 'log_tf/npy/countersWdiv4n.npy')
+# toArraySave(frequency, os.path.join(npy_path, 'frequency.npy'))
+# toArraySave(counters1, os.path.join(npy_path, 'counters1.npy'))
+# toArraySave(counters2, os.path.join(npy_path, 'counters2.npy'))
+# toArraySave(countersWdiv4n, os.path.join(npy_path, 'countersWdiv4n.npy'))
