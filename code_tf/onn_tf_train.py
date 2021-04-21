@@ -25,7 +25,7 @@ learning_rate = 0.01
 decay_rate = 0.96
 decay_step = 1000
 
-checkpoint_path = 'log_tf/10_512_round_clamp_floor_relu/limit'
+checkpoint_path = 'log_tf/10_512_round_clamp_floor_relu_e_noAdd3/limit'
 
 ############### data pre-processing ###############
 
@@ -84,7 +84,7 @@ def Linear(inputs, in_size, out_size, activation_func=None):
     # b = round_(clamp_bias)
 
     counters = floor(inputs / 10) - 1
-    outputs = tf.matmul(counters, w) + 3
+    outputs = tf.matmul(counters, w)
 
     if activation_func != None:
         outputs = activation_func(outputs)
@@ -92,8 +92,13 @@ def Linear(inputs, in_size, out_size, activation_func=None):
     return outputs, clamp_weights
 
 def mapping(inputs, in_size):
-    countersWdiv4n = floor(inputs / (4 * in_size))
-    outputs = (countersWdiv4n + 5) * 10
+    e = tf.Variable(0, dtype=tf.float32, name='e')
+    e = round_(e)
+    N = 2**e
+
+    countersWdiv4n = floor(inputs / N)
+    clamp_countersWdiv4n = clamp(countersWdiv4n, -19., 15.)
+    outputs = (clamp_countersWdiv4n + 5) * 10
     return outputs
 
 def BatchNorm(inputs, is_train=False):

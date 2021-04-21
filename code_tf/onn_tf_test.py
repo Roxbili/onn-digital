@@ -20,9 +20,9 @@ output_size = 10
 
 batch_size = 1000
 
-checkpoint_dir = 'log_tf/10_512_round_clamp_floor_relu_01/'
-checkpoint_quant_path = 'log_tf/10_512_round_clamp_floor_final/quant'
-quant = False 
+checkpoint_dir = 'log_tf/10_512_round_clamp_floor_relu_e_noAdd3/'
+checkpoint_quant_path = 'log_tf/10_512_round_clamp_floor_relu_e_noAdd3_quant/quant'
+quant = False
 
 ############### quantization ###############
 
@@ -34,7 +34,9 @@ if quant == True:
 
             #除了修改参数名称，还可以修改参数值（var）
             # print(var)
-            if var_name == 'weight' or var_name == 'weight_1':
+            if 'e' in var_name:
+                var = tf.round(var)
+            elif var_name == 'weight' or var_name == 'weight_1':
                 print('quant', var_name)
                 var = tf.clip_by_value(var, -3., 3.)
                 var = tf.round(var)
@@ -48,7 +50,7 @@ if quant == True:
         saver = tf.train.Saver(var_list=new_var_list) #构造一个保存器
         sess.run(tf.global_variables_initializer()) #初始化一下参数（这一步必做）
         saver.save(sess, checkpoint_quant_path) #直接进行保存
-        print("done !")
+        print("done! Change quant flag to False and run again.")
     sys.exit(0)
 
 ############### data pre-processing ###############
@@ -82,14 +84,19 @@ def Linear(inputs, in_size, out_size):
 
     counters = tf.floor(inputs / 10) - 1
     # counters = tf.nn.relu(counters)
-    outputs = tf.matmul(counters, w) + 3
+    outputs = tf.matmul(counters, w)
 
     return outputs, w, counters
 
 def mapping(inputs, in_size):
-    countersWdiv4n = tf.floor(inputs / (4 * in_size))
-    outputs = (countersWdiv4n + 5) * 10
-    return outputs, countersWdiv4n
+    e = tf.Variable(0, dtype=tf.float32, name='e')
+    e = tf.round(e)
+    N = 2**e
+
+    countersWdiv4n = tf.floor(inputs / N)
+    clamp_countersWdiv4n = tf.clip_by_value(countersWdiv4n, -19., 15.)
+    outputs = (clamp_countersWdiv4n + 5) * 10
+    return outputs, clamp_countersWdiv4n
 
 x = tf.placeholder(tf.float32, (None, input_size))
 y = tf.placeholder(tf.int32, (None, output_size))
@@ -115,7 +122,7 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, 'float'))
 
 ############################# run #############################
 
-npy_path = 'log_tf/npy'
+npy_path = 'log_tf/npy_e_noAdd3'
 w1, w2 = sess.run([weight1, weight2])
 np.save(os.path.join(npy_path, 'w1.npy'), w1)
 np.save(os.path.join(npy_path, 'w2.npy'), w2)
@@ -130,7 +137,7 @@ for i, (images, labels) in enumerate(input_test_data):
     acc_ = sess.run(accuracy, feed_dict={x: images, y: labels, dropout_rate: 0})
     total_accuracy += acc_ * batch_size / len(test_fv)
 
-    f, c1, c2, cwdiv4n = sess.run([l1_mapping, l1_counters, l2_counters, l1_countersWdiv4n], feed_dict={x: images, y: labels, dropout_rate: 0})
+    f, c1, c2, cwdiv4n = sess.run([l1_relu, l1_counters, l2_counters, l1_countersWdiv4n], feed_dict={x: images, y: labels, dropout_rate: 0})
     frequency.append(f)
     counters1.append(c1)
     counters2.append(c2)
@@ -139,12 +146,12 @@ for i, (images, labels) in enumerate(input_test_data):
 print('Accuracy of the network on the 10000 test images: %.4f' % total_accuracy)
 
 
-# def toArraySave(lst, path):
-#     tmp = np.array(lst)
-#     np.save(path, tmp)
-#     print('save %s successfully' % path)
+def toArraySave(lst, path):
+    tmp = np.array(lst)
+    np.save(path, tmp)
+    print('save %s successfully' % path)
 
-# toArraySave(frequency, os.path.join(npy_path, 'frequency.npy'))
-# toArraySave(counters1, os.path.join(npy_path, 'counters1.npy'))
-# toArraySave(counters2, os.path.join(npy_path, 'counters2.npy'))
-# toArraySave(countersWdiv4n, os.path.join(npy_path, 'countersWdiv4n.npy'))
+toArraySave(frequency, os.path.join(npy_path, 'frequency.npy'))
+toArraySave(counters1, os.path.join(npy_path, 'counters1.npy'))
+toArraySave(counters2, os.path.join(npy_path, 'counters2.npy'))
+toArraySave(countersWdiv4n, os.path.join(npy_path, 'countersWdiv4n.npy'))
