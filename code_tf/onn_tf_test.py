@@ -20,8 +20,8 @@ output_size = 10
 
 batch_size = 1000
 
-checkpoint_dir = 'log_tf/10_512_round_clamp_floor_relu_e_noAdd3/'
-checkpoint_quant_path = 'log_tf/10_512_round_clamp_floor_relu_e_noAdd3_quant/quant'
+checkpoint_dir = 'log_tf/10_512_round_clamp_floor_e_noAdd3/'
+checkpoint_quant_path = 'log_tf/10_512_round_clamp_floor_e_noAdd3_quant/quant'
 quant = False
 
 ############### quantization ###############
@@ -75,16 +75,20 @@ input_test_data = test_feature.cut_into_batch(batch_size=batch_size, vector=test
 
 sess = tf.Session()
 
-def Linear(inputs, in_size, out_size):
+def Linear(inputs, in_size, out_size, activation_func=None):
     # Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=1))
     Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=3), name='weight')
+
     clamp_weights = tf.clip_by_value(Weights, -3., 3.)
 
     w = tf.round(clamp_weights)
+    # b = round_(clamp_bias)
 
     counters = tf.floor(inputs / 10) - 1
-    # counters = tf.nn.relu(counters)
     outputs = tf.matmul(counters, w)
+
+    if activation_func != None:
+        outputs = activation_func(outputs)
 
     return outputs, w, counters
 
@@ -103,10 +107,10 @@ y = tf.placeholder(tf.int32, (None, output_size))
 dropout_rate = tf.placeholder(tf.float32)  # dropout rate
 
 # Net
-l1, weight1, l1_counters = Linear(x, input_size, layer1_node)
+l1, weight1, l1_counters = Linear(x, input_size, layer1_node, activation_func=tf.nn.relu)
 l1_mapping, l1_countersWdiv4n = mapping(l1, input_size)
 l1_relu = tf.nn.relu(l1_mapping)
-l1_dropout = tf.nn.dropout(l1_relu, rate=dropout_rate)
+l1_dropout = tf.nn.dropout(l1_mapping, rate=dropout_rate)
 
 prediction, weight2, l2_counters = Linear(l1_dropout, layer1_node, output_size)
 
@@ -122,7 +126,7 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, 'float'))
 
 ############################# run #############################
 
-npy_path = 'log_tf/npy_e_noAdd3'
+npy_path = 'log_tf/npy_e_noAdd3_noChangeRelu'
 w1, w2 = sess.run([weight1, weight2])
 np.save(os.path.join(npy_path, 'w1.npy'), w1)
 np.save(os.path.join(npy_path, 'w2.npy'), w2)

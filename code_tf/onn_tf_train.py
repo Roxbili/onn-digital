@@ -15,7 +15,7 @@ import tensorflow as tf
 ############### network parameters ###############
 input_size = 100
 layer1_node = 512
-# layer2_node = 32
+# layer2_node = 64
 output_size = 10
 
 batch_size = 1000
@@ -25,7 +25,7 @@ learning_rate = 0.01
 decay_rate = 0.96
 decay_step = 1000
 
-checkpoint_path = 'log_tf/10_512_round_clamp_floor_relu_e_noAdd3/limit'
+checkpoint_path = 'log_tf/10_64_64_round_clamp_floor_e_noAdd3/limit'
 
 ############### data pre-processing ###############
 
@@ -136,7 +136,7 @@ lr_current = tf.train.exponential_decay(learning_rate, global_step, decay_step, 
 
 ############################### Network ###############################
 
-l1, weight1 = Linear(x, input_size, layer1_node, activation_func=None)
+l1, weight1 = Linear(x, input_size, layer1_node, activation_func=tf.nn.relu)
 l1_mapping = mapping(l1, input_size)
 if batch_norm == True:
     l1_batchnorm = tf.layers.batch_normalization(l1_mapping, training=is_train)
@@ -144,9 +144,9 @@ if batch_norm == True:
     l1_relu = tf.nn.relu(l1_batchnorm)
 else:
     l1_relu = tf.nn.relu(l1_mapping)
-l1_dropout = tf.nn.dropout(l1_relu, rate=dropout_rate)
+l1_dropout = tf.nn.dropout(l1_mapping, rate=dropout_rate)
 
-# l2, weight2 = Linear(l1_relu, layer1_node, layer2_node)
+# l2, weight2 = Linear(l1_mapping, layer1_node, layer2_node, activation_func=tf.nn.relu)
 # l2_mapping = mapping(l2, layer1_node)
 # if batch_norm == True:
 #     l2_batchnorm = tf.layers.batch_normalization(l2_mapping, training=is_train)
@@ -154,10 +154,10 @@ l1_dropout = tf.nn.dropout(l1_relu, rate=dropout_rate)
 #     l2_relu = tf.nn.relu(l2_batchnorm)
 # else:
 #     l2_relu = tf.nn.relu(l2_mapping)
-# l2_dropout = tf.nn.dropout(l2_relu, rate=dropout_rate)
+# l2_dropout = tf.nn.dropout(l2_mapping, rate=dropout_rate)
 
 prediction, weight2 = Linear(l1_dropout, layer1_node, output_size)
-# prediction, weight2 = Linear(l2_relu, layer2_node, output_size)
+# prediction, weight2 = Linear(l2_dropout, layer2_node, output_size)
 
 # tf.contrib.quantize.experimental_create_training_graph(sess.graph,
 #                                                         weight_bits=3,
