@@ -13,7 +13,7 @@ import tensorflow as tf
 
 
 ############### network parameters ###############
-input_size = 100
+input_size = 9
 layer1_node = 512
 # layer2_node = 64
 output_size = 10
@@ -25,10 +25,11 @@ learning_rate = 0.01
 decay_rate = 0.96
 decay_step = 1000
 
-checkpoint_path = 'log_tf/10_64_64_round_clamp_floor_e_noAdd3/limit'
+checkpoint_path = 'log_tf/9in_10_512_round_clamp_floor_e_noAdd3/limit'
 
 ############### data pre-processing ###############
-
+ 
+# 10类，100输入
 train_set = MNIST('mnist', 'train', (10, 10))
 test_set = MNIST('mnist', 't10k', (10, 10))
 
@@ -44,6 +45,28 @@ test_fv, test_label = test_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8,
 test_fv = test_fv.reshape(-1, 100)
 test_fv = rescale(test_fv, 50, 200, True)
 input_test_data = test_feature.cut_into_batch(batch_size=batch_size, vector=test_fv, labels=test_label, num_class=output_size, one_hot=True)
+
+
+'''
+# 10类，9输入
+train_set = MNIST('mnist', 'train', (10, 10))
+test_set = MNIST('mnist', 't10k', (10, 10))
+
+train_feature = Feature(train_set.data, kernel_size=(4,4), stride=(3,3))
+train_v, train_label = train_feature.calc_feature_vector()
+train_fv, train_label = train_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], train_v, train_label)
+train_fv = train_fv.reshape(-1, 9)
+train_fv = rescale(train_fv, 50, 200, True)
+input_train_data = train_feature.cut_into_batch(batch_size=batch_size, vector=train_fv, labels=train_label, num_class=output_size, one_hot=True)
+
+
+test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
+test_v, test_label = test_feature.calc_feature_vector()
+test_fv, test_label = test_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], test_v, test_label)
+test_fv = test_fv.reshape(-1, 9)
+test_fv = rescale(test_fv, 50, 200, True)
+input_test_data = test_feature.cut_into_batch(batch_size=batch_size, vector=test_fv, labels=test_label, num_class=output_size, one_hot=True)
+'''
 
 ############### 网络组件 ###############
 
