@@ -23,6 +23,7 @@ batch_size = 1000
 checkpoint_dir = 'log_tf/10_512_round_clamp_floor_e_noAdd3/'
 checkpoint_quant_path = 'log_tf/10_512_round_clamp_floor_e_noAdd3_quant/quant'
 quant = False
+save = False
 
 ############### quantization ###############
 
@@ -97,8 +98,8 @@ def mapping(inputs, in_size):
     e = tf.round(e)
     N = 2**e
 
-    countersWdiv4n = tf.floor(inputs / N)
-    clamp_countersWdiv4n = tf.clip_by_value(countersWdiv4n, -19., 15.)
+    countersWdiv4n = tf.round(inputs / N)
+    clamp_countersWdiv4n = tf.clip_by_value(countersWdiv4n, 0., 15.) 
     outputs = (clamp_countersWdiv4n + 5) * 10
     return outputs, clamp_countersWdiv4n
 
@@ -126,10 +127,11 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, 'float'))
 
 ############################# run #############################
 
-npy_path = 'log_tf/npy_e_noAdd3_noChangeRelu'
-w1, w2 = sess.run([weight1, weight2])
-np.save(os.path.join(npy_path, 'w1.npy'), w1)
-np.save(os.path.join(npy_path, 'w2.npy'), w2)
+if save == True:
+    npy_path = 'log_tf/npy_e_noAdd3_noChangeRelu'
+    w1, w2 = sess.run([weight1, weight2])
+    np.save(os.path.join(npy_path, 'w1.npy'), w1)
+    np.save(os.path.join(npy_path, 'w2.npy'), w2)
 
 frequency = []
 counters1 = []
@@ -150,12 +152,13 @@ for i, (images, labels) in enumerate(input_test_data):
 print('Accuracy of the network on the 10000 test images: %.4f' % total_accuracy)
 
 
-def toArraySave(lst, path):
-    tmp = np.array(lst)
-    np.save(path, tmp)
-    print('save %s successfully' % path)
+if save == True:
+    def toArraySave(lst, path):
+        tmp = np.array(lst)
+        np.save(path, tmp)
+        print('save %s successfully' % path)
 
-toArraySave(frequency, os.path.join(npy_path, 'frequency.npy'))
-toArraySave(counters1, os.path.join(npy_path, 'counters1.npy'))
-toArraySave(counters2, os.path.join(npy_path, 'counters2.npy'))
-toArraySave(countersWdiv4n, os.path.join(npy_path, 'countersWdiv4n.npy'))
+    toArraySave(frequency, os.path.join(npy_path, 'frequency.npy'))
+    toArraySave(counters1, os.path.join(npy_path, 'counters1.npy'))
+    toArraySave(counters2, os.path.join(npy_path, 'counters2.npy'))
+    toArraySave(countersWdiv4n, os.path.join(npy_path, 'countersWdiv4n.npy'))

@@ -13,8 +13,8 @@ import tensorflow as tf
 
 
 ############### network parameters ###############
-input_size = 9
-layer1_node = 512
+input_size = 100
+layer1_node = 256
 # layer2_node = 64
 output_size = 10
 
@@ -25,7 +25,7 @@ learning_rate = 0.01
 decay_rate = 0.96
 decay_step = 1000
 
-checkpoint_path = 'log_tf/9in_10_512_round_clamp_floor_e_noAdd3/limit'
+checkpoint_path = 'log_tf/10_256_round_clamp_floor_e_noAdd3/limit'
 
 ############### data pre-processing ###############
  
@@ -115,12 +115,13 @@ def Linear(inputs, in_size, out_size, activation_func=None):
     return outputs, clamp_weights
 
 def mapping(inputs, in_size):
+    # e = tf.Variable(tf.zeros([1, in_size]), dtype=tf.float32, name='e')
     e = tf.Variable(0, dtype=tf.float32, name='e')
     e = round_(e)
     N = 2**e
 
-    countersWdiv4n = floor(inputs / N)
-    clamp_countersWdiv4n = clamp(countersWdiv4n, -19., 15.)
+    countersWdiv4n = round_(inputs / N)
+    clamp_countersWdiv4n = clamp(countersWdiv4n, 0., 15.)
     outputs = (clamp_countersWdiv4n + 5) * 10
     return outputs
 
@@ -160,7 +161,7 @@ lr_current = tf.train.exponential_decay(learning_rate, global_step, decay_step, 
 ############################### Network ###############################
 
 l1, weight1 = Linear(x, input_size, layer1_node, activation_func=tf.nn.relu)
-l1_mapping = mapping(l1, input_size)
+l1_mapping = mapping(l1, layer1_node)
 if batch_norm == True:
     l1_batchnorm = tf.layers.batch_normalization(l1_mapping, training=is_train)
     # l1_batchnorm = BatchNorm(l1_mapping, is_train=is_train)
