@@ -64,6 +64,29 @@ def rescale(input, bottom_line, top_line, is_round=True):
         ret = ret // 10 * 10    # round to multiples of 10
     return ret.astype(np.int)
 
+def maxPooling(feature_map, size=2, stride=2):
+    channel=feature_map.shape[0]
+    height=feature_map.shape[1]
+    width=feature_map.shape[2]
+
+    pool_out = np.zeros((channel, int((height - size) / stride + 1), int((width - size) / stride + 1)))
+    
+    for map_num in range(channel):  
+        out_height = 0  
+        for r in np.arange(0,height, stride):  
+            out_width = 0  
+            for c in np.arange(0, width, stride):  
+                pool_out[map_num,out_height, out_width] = np.max(feature_map[map_num,r:r+size,c:c+size])  
+                out_width=out_width+1
+            out_height=out_height+1
+    return pool_out
+
+def generate_frequency(inputs):
+    outputs = np.floor(inputs / 2**4)
+    outputs = (outputs + 5) * 10
+
+    return outputs
+
 def softmax(x):
     """Compute the softmax function for each row of the input x.
 

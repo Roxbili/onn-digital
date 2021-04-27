@@ -5,7 +5,7 @@ import numpy as np
 import sys
 sys.path.append('../onn-digital')
 
-from utils.utils import rescale, softmax
+from utils.utils import rescale, softmax, generate_frequency, maxPooling
 from dataset import MNIST, Feature
 from model import Net_1, Net_2, Optim, AccFunc, CrossEntropyLoss
 
@@ -14,8 +14,9 @@ import tensorflow as tf
 
 ############### network parameters ###############
 input_size = 100
-layer1_node = 256
+layer1_node = 64
 # layer2_node = 64
+# layer3_node = 32
 output_size = 10
 
 batch_size = 1000
@@ -25,25 +26,47 @@ learning_rate = 0.01
 decay_rate = 0.96
 decay_step = 1000
 
-checkpoint_path = 'log_tf/10_256_round_clamp_floor_e_noAdd3/limit'
+checkpoint_path = 'log_tf/10_64_round_clamp_floor_e_noAdd3_genInputs/limit'
 
 ############### data pre-processing ###############
- 
+
+'''
+# 10类，28x28输入
+train_set = MNIST('mnist', 'train', None)
+test_set = MNIST('mnist', 't10k', None)
+
+train_feature = Feature(train_set.data, kernel_size=(4,4), stride=(3,3))
+train_fv, train_label = train_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+# train_fv = rescale(train_fv, 50, 200, True)
+train_fv = maxPooling(train_fv, size=4, stride=6)
+train_fv = generate_frequency(train_fv)
+train_fv = train_fv.reshape(-1, 25)    # train_fv shape (batch_size, )
+input_train_data = train_feature.cut_into_batch(batch_size=batch_size, vector=train_fv, labels=train_label, num_class=output_size, one_hot=True)
+
+
+test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
+test_fv, test_label = test_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+# test_fv = rescale(test_fv, 50, 200, True)
+test_fv = generate_frequency(test_fv, size=4, stride=6)
+test_fv = test_fv.reshape(-1, 25)
+input_test_data = test_feature.cut_into_batch(batch_size=batch_size, vector=test_fv, labels=test_label, num_class=output_size, one_hot=True)
+'''
+
 # 10类，100输入
 train_set = MNIST('mnist', 'train', (10, 10))
 test_set = MNIST('mnist', 't10k', (10, 10))
 
 train_feature = Feature(train_set.data, kernel_size=(4,4), stride=(3,3))
 train_fv, train_label = train_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-train_fv = train_fv.reshape(-1, 100)
-train_fv = rescale(train_fv, 50, 200, True)
+train_fv = generate_frequency(train_fv)
+train_fv = train_fv.reshape(-1, 100)    # train_fv shape (batch_size, )
 input_train_data = train_feature.cut_into_batch(batch_size=batch_size, vector=train_fv, labels=train_label, num_class=output_size, one_hot=True)
 
 
 test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
 test_fv, test_label = test_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+test_fv = generate_frequency(test_fv)
 test_fv = test_fv.reshape(-1, 100)
-test_fv = rescale(test_fv, 50, 200, True)
 input_test_data = test_feature.cut_into_batch(batch_size=batch_size, vector=test_fv, labels=test_label, num_class=output_size, one_hot=True)
 
 
@@ -171,7 +194,7 @@ else:
 l1_dropout = tf.nn.dropout(l1_mapping, rate=dropout_rate)
 
 # l2, weight2 = Linear(l1_mapping, layer1_node, layer2_node, activation_func=tf.nn.relu)
-# l2_mapping = mapping(l2, layer1_node)
+# l2_mapping = mapping(l2, layer2_node)
 # if batch_norm == True:
 #     l2_batchnorm = tf.layers.batch_normalization(l2_mapping, training=is_train)
 #     # l2_batchnorm = BatchNorm(l2_mapping, is_train=is_train)
@@ -180,8 +203,19 @@ l1_dropout = tf.nn.dropout(l1_mapping, rate=dropout_rate)
 #     l2_relu = tf.nn.relu(l2_mapping)
 # l2_dropout = tf.nn.dropout(l2_mapping, rate=dropout_rate)
 
+# l3, weight3 = Linear(l2_mapping, layer2_node, layer3_node, activation_func=tf.nn.relu)
+# l3_mapping = mapping(l3, layer3_node)
+# if batch_norm == True:
+#     l3_batchnorm = tf.layers.batch_normalization(l3_mapping, training=is_train)
+#     # l3_batchnorm = BatchNorm(l3_mapping, is_train=is_train)
+#     l3_relu = tf.nn.relu(l3_batchnorm)
+# else:
+#     l3_relu = tf.nn.relu(l3_mapping)
+# l3_dropout = tf.nn.dropout(l3_mapping, rate=dropout_rate)
+
 prediction, weight2 = Linear(l1_dropout, layer1_node, output_size)
 # prediction, weight2 = Linear(l2_dropout, layer2_node, output_size)
+# prediction, weight2 = Linear(l3_dropout, layer3_node, output_size)
 
 # tf.contrib.quantize.experimental_create_training_graph(sess.graph,
 #                                                         weight_bits=3,
