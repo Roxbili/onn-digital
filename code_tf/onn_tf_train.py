@@ -3,6 +3,7 @@
 import os
 import numpy as np
 import sys
+import time
 sys.path.append('../onn-digital')
 
 from utils.utils import rescale, softmax, generate_frequency, maxPooling
@@ -13,7 +14,7 @@ import tensorflow as tf
 
 
 ############### network parameters ###############
-input_size = 100
+input_size = 49
 layer1_node = 64
 # layer2_node = 64
 # layer3_node = 32
@@ -30,7 +31,9 @@ checkpoint_path = 'log_tf/10_64_round_clamp_floor_e_noAdd3_genInputs/limit'
 
 ############### data pre-processing ###############
 
-'''
+pre_start = time.time()
+
+
 # 10类，28x28输入
 train_set = MNIST('mnist', 'train', None)
 test_set = MNIST('mnist', 't10k', None)
@@ -38,37 +41,41 @@ test_set = MNIST('mnist', 't10k', None)
 train_feature = Feature(train_set.data, kernel_size=(4,4), stride=(3,3))
 train_fv, train_label = train_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 # train_fv = rescale(train_fv, 50, 200, True)
-train_fv = maxPooling(train_fv, size=4, stride=6)
+train_fv = maxPooling(train_fv, size=4, stride=4)
 train_fv = generate_frequency(train_fv)
-train_fv = train_fv.reshape(-1, 25)    # train_fv shape (batch_size, )
+train_fv = train_fv.reshape(-1, input_size)    # train_fv shape (batch_size, )
 input_train_data = train_feature.cut_into_batch(batch_size=batch_size, vector=train_fv, labels=train_label, num_class=output_size, one_hot=True)
 
 
 test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
 test_fv, test_label = test_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 # test_fv = rescale(test_fv, 50, 200, True)
-test_fv = generate_frequency(test_fv, size=4, stride=6)
-test_fv = test_fv.reshape(-1, 25)
+test_fv = maxPooling(test_fv, size=4, stride=4)
+test_fv = generate_frequency(test_fv)
+test_fv = test_fv.reshape(-1, input_size)
 input_test_data = test_feature.cut_into_batch(batch_size=batch_size, vector=test_fv, labels=test_label, num_class=output_size, one_hot=True)
-'''
 
+
+'''
 # 10类，100输入
 train_set = MNIST('mnist', 'train', (10, 10))
 test_set = MNIST('mnist', 't10k', (10, 10))
 
 train_feature = Feature(train_set.data, kernel_size=(4,4), stride=(3,3))
 train_fv, train_label = train_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+train_fv = maxPooling(train_fv, size=2, stride=2)
 train_fv = generate_frequency(train_fv)
-train_fv = train_fv.reshape(-1, 100)    # train_fv shape (batch_size, )
+train_fv = train_fv.reshape(-1, input_size)    # train_fv shape (batch_size, )
 input_train_data = train_feature.cut_into_batch(batch_size=batch_size, vector=train_fv, labels=train_label, num_class=output_size, one_hot=True)
 
 
 test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
 test_fv, test_label = test_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+test_fv = maxPooling(test_fv, size=2, stride=2)
 test_fv = generate_frequency(test_fv)
-test_fv = test_fv.reshape(-1, 100)
+test_fv = test_fv.reshape(-1, input_size)
 input_test_data = test_feature.cut_into_batch(batch_size=batch_size, vector=test_fv, labels=test_label, num_class=output_size, one_hot=True)
-
+'''
 
 '''
 # 10类，9输入
@@ -90,6 +97,11 @@ test_fv = test_fv.reshape(-1, 9)
 test_fv = rescale(test_fv, 50, 200, True)
 input_test_data = test_feature.cut_into_batch(batch_size=batch_size, vector=test_fv, labels=test_label, num_class=output_size, one_hot=True)
 '''
+
+pre_end = time.time()
+print('=' * 50)
+print('data pre-processing time: {}'.format(pre_end - pre_start))
+print('=' * 50)
 
 ############### 网络组件 ###############
 
