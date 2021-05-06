@@ -23,6 +23,9 @@ output_size = 10
 batch_size = 1000
 epoch = 1000
 
+param_low = -3.
+param_high = 3.
+
 learning_rate = 0.01
 decay_rate = 0.96
 decay_step = 1000
@@ -135,7 +138,7 @@ def Linear(inputs, in_size, out_size, activation_func=None):
     Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=3), name='weight')
     # Bias = tf.Variable(tf.zeros([out_size]))
 
-    clamp_weights = clamp(Weights, -3., 3.)
+    clamp_weights = clamp(Weights, param_low, param_high)
     # clamp_bias = clamp(Bias, -3., 3.)
 
     w = round_(clamp_weights)

@@ -20,6 +20,9 @@ output_size = 10
 
 batch_size = 1000
 
+param_low = -3.
+param_high = 3.
+
 checkpoint_dir = 'log_tf/10_64_round_clamp_floor_e_noAdd3_genInputs/'
 checkpoint_quant_path = 'log_tf/10_64_round_clamp_floor_e_noAdd3_genInputs_quant/quant'
 quant = False
@@ -39,7 +42,7 @@ if quant == True:
                 var = tf.round(var)
             elif var_name == 'weight' or var_name == 'weight_1':
                 print('quant', var_name)
-                var = tf.clip_by_value(var, -3., 3.)
+                var = tf.clip_by_value(var, param_low, param_high)
                 var = tf.round(var)
                 # print(var)
             # print(var_name, var.max(), var.min())
@@ -82,7 +85,7 @@ def Linear(inputs, in_size, out_size, activation_func=None):
     # Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=1))
     Weights = tf.Variable(tf.truncated_normal([in_size,out_size], mean=0, stddev=3), name='weight')
 
-    clamp_weights = tf.clip_by_value(Weights, -3., 3.)
+    clamp_weights = tf.clip_by_value(Weights, param_low, param_high)
 
     w = tf.round(clamp_weights)
     # b = round_(clamp_bias)
