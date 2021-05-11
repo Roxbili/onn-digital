@@ -37,10 +37,10 @@ def save_paramaeters(npy_path, bin_path):
 
     print('start generating bin file...')
     w1_bin_path = os.path.join(bin_path, 'w1.bin')
-    save_bin(weight1, w1_bin_path)
+    save_bin(weight1.T, w1_bin_path)    # 100个100个给，给64次
 
     w2_bin_path = os.path.join(bin_path, 'w2.bin')
-    save_bin(weight2, w2_bin_path)
+    save_bin(weight2.T, w2_bin_path)
 
 def save_inputs(bin_path, num):
     input_size = 100
@@ -82,5 +82,5 @@ if __name__ == "__main__":
     if os.path.exists(bin_path) == False:
         os.mkdir(bin_path)
 
-    # save_paramaeters(npy_path, bin_path)
-    save_inputs(bin_path, 2)
+    save_paramaeters(npy_path, bin_path)
+    # save_inputs(bin_path, 2)
