@@ -3,23 +3,35 @@
 import os
 import numpy as np
 import sys
+
+from numpy.__config__ import show
 sys.path.append('../onn-digital')
 
 from utils.utils import rescale, softmax, generate_frequency, maxPooling
 from dataset import MNIST, Feature
 
 
+def show_info(data, title):
+    print('================ %s ================' % title)
+    print(data)
+    print()
+
 ############### Net ###############
 
 class Net(object):
-    def __init__(self, weight1, weight2, e1):
+    def __init__(self, weight1, weight2, e1, print_intermediate=False):
         self.weight1 = weight1
         self.weight2 = weight2
         self.e1 = e1
+        self.print_intermediate = print_intermediate    # 是否打印中间结果
 
     def Linear(self, inputs, weight, activation_func=None):
         counters = np.floor(inputs / 10) - 1
         outputs = np.dot(counters, weight)
+
+        if self.print_intermediate:
+            show_info(counters, title='counters')
+            show_info(outputs, title='counters x weight')
 
         if activation_func != None:
             outputs = activation_func(outputs)
@@ -27,7 +39,10 @@ class Net(object):
         return outputs
 
     def relu(self, inputs):
-        return np.maximum(0, inputs)
+        outputs =  np.maximum(0, inputs)
+        if self.print_intermediate:
+            show_info(outputs, title='relu')
+        return outputs
 
     def mapping(self, inputs, e):
         N = 2**e
@@ -35,9 +50,18 @@ class Net(object):
         countersWdiv4n = np.round(inputs / N)
         clamp_countersWdiv4n = np.clip(countersWdiv4n, 0., 15.) 
         outputs = (clamp_countersWdiv4n + 5) * 10
+
+        if self.print_intermediate:
+            show_info(e, title='e and N = 2^e')
+            show_info(clamp_countersWdiv4n, title='after shift and clip to (0, 15)')
+            show_info(outputs, 'frequency')
+
         return outputs
     
     def __call__(self, inputs):
+        if self.print_intermediate:
+            show_info(inputs, title='input frequency')
+
         outputs = self.Linear(inputs, self.weight1, activation_func=self.relu)
         outputs = self.mapping(outputs, self.e1)
         outputs = self.Linear(outputs, self.weight2)

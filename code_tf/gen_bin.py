@@ -1,12 +1,15 @@
 #-*- encoding: utf-8 -*-
 
+from functools import total_ordering
 import numpy as np
 import os, sys
+
+from numpy.__config__ import show
 sys.path.append('../onn-digital')
 
 from utils.utils import rescale, softmax, generate_frequency, maxPooling
 from dataset import MNIST, Feature
-from code_tf.onn_numpy_test import Net
+from code_tf.onn_numpy_test import Net, show_info
 
 
 def save_bin(data, binary_path):
@@ -62,12 +65,21 @@ def save_inputs(bin_path, num):
 
     net = Net(weight1, weight2, e1)
     for i, (images, labels) in enumerate(input_test_data): 
+
+        # 由于数据集是有序的，这里专门针对提供的图片2进行处理，这段代码没有泛用性
+        if num == 1 and np.argmax(labels, 1)[0] == 2:
+            net.print_intermediate = True
+        else:
+            net.print_intermediate = False
+            
         prediction = net(images)
+
         correct_prediction = np.equal(np.argmax(prediction, 1), np.argmax(labels, 1))
         if correct_prediction[0] == True:
             data = test_fv[i].astype(np.uint8)
-            save_bin(data.flatten(), os.path.join(bin_path, str(np.argmax(labels, 1)[0]) + '.bin'))
-            print(data)
+            # save_bin(data.flatten(), os.path.join(bin_path, str(np.argmax(labels, 1)[0]) + '.bin'))
+            # print(np.argmax(labels, 1)[0])
+            # print(data)
 
             num -= 1
             if num == 0:
@@ -82,5 +94,5 @@ if __name__ == "__main__":
     if os.path.exists(bin_path) == False:
         os.mkdir(bin_path)
 
-    save_paramaeters(npy_path, bin_path)
-    # save_inputs(bin_path, 2)
+    # save_paramaeters(npy_path, bin_path)
+    save_inputs(bin_path, 2)

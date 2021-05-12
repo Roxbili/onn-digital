@@ -3,6 +3,8 @@
 import os
 import numpy as np
 import sys
+
+from tensorflow.python.ops.gen_nn_ops import l2_loss
 sys.path.append('../onn-digital')
 
 from utils.utils import rescale, softmax, generate_frequency, maxPooling
@@ -93,10 +95,12 @@ def Linear(inputs, in_size, out_size, activation_func=None):
     counters = tf.floor(inputs / 10) - 1
     outputs = tf.matmul(counters, w)
 
+    cxw = tf.identity(outputs)
+
     if activation_func != None:
         outputs = activation_func(outputs)
 
-    return outputs, w, counters
+    return outputs, w, counters, cxw
 
 def mapping(inputs, in_size):
     e = tf.Variable(0, dtype=tf.float32, name='e')
@@ -113,12 +117,12 @@ y = tf.placeholder(tf.int32, (None, output_size))
 dropout_rate = tf.placeholder(tf.float32)  # dropout rate
 
 # Net
-l1, weight1, l1_counters = Linear(x, input_size, layer1_node, activation_func=tf.nn.relu)
+l1, weight1, l1_counters, l1_cxw = Linear(x, input_size, layer1_node, activation_func=tf.nn.relu)
 l1_mapping, l1_countersWdiv4n, l1_e = mapping(l1, input_size)
 l1_relu = tf.nn.relu(l1_mapping)
 l1_dropout = tf.nn.dropout(l1_mapping, rate=dropout_rate)
 
-prediction, weight2, l2_counters = Linear(l1_dropout, layer1_node, output_size)
+prediction, weight2, l2_counters, l2_cxw = Linear(l1_dropout, layer1_node, output_size)
 
 saver = tf.train.Saver()
 saver.restore(sess, tf.train.latest_checkpoint(os.path.split(checkpoint_quant_path)[0]))
@@ -145,6 +149,8 @@ if save == True:
 frequency = []
 counters1 = []
 counters2 = []
+counters1_x_weight = []
+counters2_x_weight = []
 countersWdiv4n = []
 
 total_accuracy = 0.
@@ -152,11 +158,13 @@ for i, (images, labels) in enumerate(input_test_data):
     acc_ = sess.run(accuracy, feed_dict={x: images, y: labels, dropout_rate: 0})
     total_accuracy += acc_ * batch_size / len(test_fv)
 
-    f, c1, c2, cwdiv4n = sess.run([l1_relu, l1_counters, l2_counters, l1_countersWdiv4n], feed_dict={x: images, y: labels, dropout_rate: 0})
+    f, c1, c2, cwdiv4n, l1_cxw_, l2_cxw_ = sess.run([l1_relu, l1_counters, l2_counters, l1_countersWdiv4n, l1_cxw, l2_cxw], feed_dict={x: images, y: labels, dropout_rate: 0})
     frequency.append(f)
     counters1.append(c1)
     counters2.append(c2)
     countersWdiv4n.append(cwdiv4n)
+    counters1_x_weight.append(l1_cxw_)
+    counters2_x_weight.append(l2_cxw_)
 
 print('Accuracy of the network on the 10000 test images: %.4f' % total_accuracy)
 
@@ -171,3 +179,5 @@ if save == True:
     toArraySave(counters1, os.path.join(npy_path, 'counters1.npy'))
     toArraySave(counters2, os.path.join(npy_path, 'counters2.npy'))
     toArraySave(countersWdiv4n, os.path.join(npy_path, 'countersWdiv4n.npy'))
+    toArraySave(counters1_x_weight, os.path.join(npy_path, 'counters1_x_weight.npy'))
+    toArraySave(counters2_x_weight, os.path.join(npy_path, 'counters2_x_weight.npy'))
