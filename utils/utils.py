@@ -21,7 +21,7 @@ def save_one_img_array(index, path, img, label):
     file_path = os.path.join(path, str(index) + '_' + str(label))
     np.save(file_path, img)
 
-def save_images(path, images, labels, worker_num=4, mode='array'):
+def save_images(path, images, labels, save_num, worker_num=4, mode='array'):
     save = {
         'img': save_one_img,
         'array': save_one_img_array
@@ -29,7 +29,8 @@ def save_images(path, images, labels, worker_num=4, mode='array'):
 
     p = Pool(worker_num)
     for i in range(len(labels)):
-        if i == 100:
+        if i >= save_num:
+            print('{} images have been saved to {}'.format(save_num, path))
             break
         p.apply_async(save, args=(i, path, images[i], labels[i]))
     p.close()

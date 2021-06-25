@@ -58,7 +58,7 @@ class MNIST(object):
         ret = cv2.resize(data, dsize=shape, interpolation=cv2.INTER_AREA)
         return ret
 
-    def save_img(self, path, worker_num, mode='array'):
+    def save_img(self, path, save_num, worker_num, mode='array'):
         """Save images to path
 
             Args:
@@ -66,7 +66,7 @@ class MNIST(object):
                 worker_num: how many threads to use
                 mode: 'img' or 'array'
         """
-        save_images(path, self._data['images'], self._data['labels'], worker_num=worker_num, mode=mode)
+        save_images(path, self._data['images'], self._data['labels'], save_num, worker_num=worker_num, mode=mode)
         print('all images have been saved to %s' % path)
 
 
