@@ -48,7 +48,7 @@ def save_paramaeters(npy_path, bin_path):
     save_bin(weight2.T, w2_bin_path)
 
 def save_inputs(bin_path, num):
-    input_size = 100
+    input_size = 256
     output_size = 10
     batch_size = 1  # 只能是1，不能改变
 
@@ -56,7 +56,7 @@ def save_inputs(bin_path, num):
     weight2 = np.load(os.path.join(npy_path, 'w2.npy'))
     e1 = np.load(os.path.join(npy_path, 'e1.npy'))
 
-    test_set = MNIST('mnist', 't10k', (10, 10))
+    test_set = MNIST('mnist', 't10k', (16, 16))
 
     test_feature = Feature(test_set.data, kernel_size=(4,4), stride=(3,3))
     test_fv, test_label = test_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])

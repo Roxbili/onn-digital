@@ -15,8 +15,8 @@ import tensorflow as tf
 
 
 ############### network parameters ###############
-input_size = 100
-layer1_node = 64
+input_size = 256
+layer1_node = 256
 # layer2_node = 128
 output_size = 10
 
@@ -25,8 +25,8 @@ batch_size = 1000
 param_low = -3.
 param_high = 3.
 
-checkpoint_dir = 'log_tf/10_64_round_clamp_floor_e_noAdd3_genInputs/'
-checkpoint_quant_path = 'log_tf/10_64_round_clamp_floor_e_noAdd3_genInputs_quant/quant'
+checkpoint_dir = 'log_tf/10_256_round_clamp_floor_e_noAdd3_genInputs_16x16/'
+checkpoint_quant_path = 'log_tf/10_256_round_clamp_floor_e_noAdd3_genInputs_16x16_quant/quant'
 quant = False
 save = True
 
@@ -61,8 +61,8 @@ if quant == True:
 
 ############### data pre-processing ###############
 
-train_set = MNIST('mnist', 'train', (10, 10))
-test_set = MNIST('mnist', 't10k', (10, 10))
+train_set = MNIST('mnist', 'train', (16, 16))
+test_set = MNIST('mnist', 't10k', (16, 16))
 
 train_feature = Feature(train_set.data, kernel_size=(4,4), stride=(3,3))
 train_fv, train_label = train_feature.extract_num_class([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
