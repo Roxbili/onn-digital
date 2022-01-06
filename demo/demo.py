@@ -62,8 +62,10 @@ def init_network(model_path):
 def get_args():
     '''配置参数'''
     parser = argparse.ArgumentParser()
-    parser.add_argument('--debug', action='store_true',
-                    help='debug mode will use numpy network to inference')
+    parser.add_argument('--ps-inference', action='store_true',
+                    help='inference on ps')
+    parser.add_argument('--pl-inference', action='store_true',
+                    help='inference on ps')
     parser.add_argument('--soct', action='store_true',
                     help='whether use socket to send frame')
     parser.add_argument('--threshold', type=int, default=120,
@@ -83,10 +85,10 @@ if __name__ == '__main__':
     address = ('192.168.177.106', 6887)  # 服务端地址和端口
     # address = ('10.130.147.227', 6887)  # 服务端地址和端口
 
-    if args.debug == True:
+    if args.ps_inference == True:
         model_path = 'log_tf/10_256_round_clamp_floor_e_noAdd3_genInputs_16x16_quant'
         model = init_network(model_path)
-    else:
+    if args.pl_inference == True:
         ## bram配置
         bram = BRAM()
 
@@ -126,11 +128,11 @@ if __name__ == '__main__':
             # if fps != None:
             #     print(fps)
             
-        if args.debug:
+        if args.ps_inference:
             ############ 推理 ############
             data = data.flatten()[np.newaxis, :]
             prediction = model(data)
             print(np.argmax(prediction, 1))
-        else:
+        if args.pl_inference:
             ############# 写至pl侧 #############
             bram.write(data, 'data')
